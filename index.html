@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alber Opbr — بوابة الفحص الذكية</title>
+  <style>
+    :root { --bg: #0f172a; --card: #1e293b; --accent: #10b981; --danger: #ef4444; --text: #f8fafc; --muted: #94a3b8; }
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    .container { background: var(--card); border: 1px solid #334155; border-radius: 16px; padding: 24px; width: 100%; max-width: 580px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.4); }
+    h1 { font-size: 1.25rem; margin: 0 0 8px; color: var(--accent); text-align: center; }
+    p.sub { font-size: 0.88rem; color: var(--muted); text-align: center; margin: 0 0 20px; }
+    .drop-zone { display: block; background: rgba(16, 185, 129, 0.12); border: 2px dashed var(--accent); border-radius: 12px; padding: 28px 16px; text-align: center; cursor: pointer; transition: 0.2s; font-weight: 700; color: var(--accent); }
+    .drop-zone:hover { background: rgba(16, 185, 129, 0.22); }
+    input[type="file"] { display: none; }
+    .status-box { margin-top: 16px; padding: 14px; border-radius: 10px; background: #0f172a; font-size: 0.88rem; line-height: 1.6; display: none; border: 1px solid #334155; }
+    .btn-copy { width: 100%; margin-top: 12px; padding: 12px; border: none; border-radius: 10px; background: var(--accent); color: #064e3b; font-weight: 800; font-size: 0.95rem; cursor: pointer; display: none; }
+    .kill-screen { text-align: center; padding: 30px 10px; color: var(--danger); font-weight: 700; display: none; }
+  </style>
+</head>
+<body oncontextmenu="return false;">
+  <div class="container">
+    <div id="killScreen" class="kill-screen"></div>
+    <div id="appContent">
+      <h1>Alber Opbr — البوابة الذكية لفحص الصادرات</h1>
+      <p class="sub">فك ضغط محلي آمن 100% وتوليد حزمة ALBER-CODEC-v1.1 للشات</p>
+      
+      <label class="drop-zone" for="zipInput">
+        📁 اضغط هنا لاختيار ملف access-results.zip من جهازك
+      </label>
+      <input type="file" id="zipInput" accept=".zip">
+
+      <div id="resultBox" class="status-box"></div>
+      <button id="copyBtn" class="btn-copy">📋 نسخ حزمة ALBER-CODEC-v1.1 للصقها في الشات</button>
+    </div>
+  </div>
+
+  <!-- يتم استدعاء النسخة المشفرة هنا -->
+  <script src="core.min.js"></script>
+</body>
+</html>
