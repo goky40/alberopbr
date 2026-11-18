@@ -1,42 +1,289 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Alber Opbr — بوابة الفحص الذكية</title>
-  <style>
-    :root { --bg: #0f172a; --card: #1e293b; --accent: #10b981; --danger: #ef4444; --text: #f8fafc; --muted: #94a3b8; }
-    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
-    body { background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-    .container { background: var(--card); border: 1px solid #334155; border-radius: 16px; padding: 24px; width: 100%; max-width: 580px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.4); }
-    h1 { font-size: 1.25rem; margin: 0 0 8px; color: var(--accent); text-align: center; }
-    p.sub { font-size: 0.88rem; color: var(--muted); text-align: center; margin: 0 0 20px; }
-    .drop-zone { display: block; background: rgba(16, 185, 129, 0.12); border: 2px dashed var(--accent); border-radius: 12px; padding: 28px 16px; text-align: center; cursor: pointer; transition: 0.2s; font-weight: 700; color: var(--accent); }
-    .drop-zone:hover { background: rgba(16, 185, 129, 0.22); }
-    input[type="file"] { display: none; }
-    .status-box { margin-top: 16px; padding: 14px; border-radius: 10px; background: #0f172a; font-size: 0.88rem; line-height: 1.6; display: none; border: 1px solid #334155; }
-    .btn-copy { width: 100%; margin-top: 12px; padding: 12px; border: none; border-radius: 10px; background: var(--accent); color: #064e3b; font-weight: 800; font-size: 0.95rem; cursor: pointer; display: none; }
-    .kill-screen { text-align: center; padding: 30px 10px; color: var(--danger); font-weight: 700; display: none; }
-  </style>
-</head>
-<body oncontextmenu="return false;">
-  <div class="container">
-    <div id="killScreen" class="kill-screen"></div>
-    <div id="appContent">
-      <h1>Alber Opbr — البوابة الذكية لفحص الصادرات</h1>
-      <p class="sub">فك ضغط محلي آمن 100% وتوليد حزمة ALBER-CODEC-v1.1 للشات</p>
-      
-      <label class="drop-zone" for="zipInput">
-        📁 اضغط هنا لاختيار ملف access-results.zip من جهازك
-      </label>
-      <input type="file" id="zipInput" accept=".zip">
+(function () {
+  "use strict";
 
-      <div id="resultBox" class="status-box"></div>
-      <button id="copyBtn" class="btn-copy">📋 نسخ حزمة ALBER-CODEC-v1.1 للصقها في الشات</button>
-    </div>
-  </div>
+  const FORBIDDEN = new Set(["id", "user_id", "userid"]);
+  const DICT = [
+    ["@g", "@gmail.com"], ["@y", "@yahoo.com"], ["@h", "@hotmail.com"], ["@o", "@outlook.com"], ["@i", "@icloud.com"],
+    ["^GP", "GooglePlayStore"], ["^AP", "AppleAppStore"], ["^ST", "Stripe"], ["^PP", "PayPal"], ["^RC", "RobloxCard"], ["^CS", "CreditCard"],
+    ["^OK", "Succeeded"], ["^PN", "Pending"], ["^FL", "Failed"], ["^CH", "Charge"], ["^RF", "Refund"], ["^CB", "Chargeback"],
+    ["^RX", " Robux"], ["^PM", "Roblox Premium"], ["^1", "True"], ["^0", "False"], ["~2", "202"], ["~1", "201"]
+  ];
+  let fullCodecPayload = "";
 
-  <!-- يتم استدعاء النسخة المشفرة هنا -->
-  <script src="core.min.js"></script>
-</body>
-</html>
+  // 1. حماية الاختصارات + زر الإيقاف عن بُعد (status.json)
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "F12" || (e.ctrlKey && e.shiftKey && ["I", "J", "C"].includes(e.key.toUpperCase())) || (e.ctrlKey && e.key.toUpperCase() === "U")) {
+      e.preventDefault();
+    }
+  });
+
+  async function checkKillSwitch() {
+    try {
+      const res = await fetch("./status.json?t=" + Date.now(), { cache: "no-store" });
+      if (!res.ok) return true;
+      const cfg = await res.json();
+      if (cfg && cfg.active === false) {
+        document.getElementById("appContent").classList.add("hidden");
+        const ks = document.getElementById("killScreen");
+        ks.textContent = "⛔ " + (cfg.message || "البوابة متوقفة حالياً بأمر المطور.");
+        ks.classList.remove("hidden");
+        return false;
+      }
+    } catch (_) {}
+    return true;
+  }
+
+  function fmtReceipt(v) {
+    return String(v ?? "").trim()
+      .replace(/\bg-(GPA\.\d{4}-\d{4}-\d{4}-\d{4,5})\b/gi, "$1")
+      .replace(/\bapple-(\d{5,25})\b/gi, "$1")
+      .replace(/\bstripe-(pi_[a-zA-Z0-9_]+)\b/gi, "$1");
+  }
+
+  function encVal(v) {
+    let s = String(v ?? "").trim();
+    for (const [tk, rw] of DICT) s = s.split(rw).join(tk);
+    return s;
+  }
+
+  function parseUtc(ts) {
+    if (!ts) return null;
+    const ms = Date.parse(String(ts).trim().replace(" ", "T") + "Z");
+    return isNaN(ms) ? null : ms;
+  }
+
+  function diffHuman(msA, msB) {
+    if (msA == null || msB == null) return "-";
+    const d = Math.abs(msB - msA);
+    const days = Math.floor(d / 86400000);
+    const hrs = Math.floor((d % 86400000) / 3600000);
+    const mins = Math.floor((d % 3600000) / 60000);
+    return days > 0 ? `${days} يوم و ${hrs} ساعة` : `${hrs} ساعة و ${mins} دقيقة`;
+  }
+
+  async function processFiles(fileList) {
+    if (!(await checkKillSwitch())) return;
+    const sb = document.getElementById("statusBar");
+    sb.textContent = "⏳ جاري فك ضغط الأرشيف وتحليل الجداول جنائياً...";
+    const tables = {};
+
+    try {
+      for (const file of fileList) {
+        const lower = file.name.toLowerCase();
+        if (lower.endsWith(".zip")) {
+          const zip = await window.JSZip.loadAsync(file);
+          for (const [path, entry] of Object.entries(zip.files)) {
+            if (entry.dir || path.includes("..") || path.startsWith("/")) continue;
+            const short = path.split("/").pop().toLowerCase();
+            if (!short.endsWith(".csv") && !short.endsWith(".txt")) continue;
+            const txt = (await entry.async("string")).trim();
+            if (!txt) continue;
+            if (short.endsWith(".csv")) {
+              const p = window.Papa.parse(txt, { header: true, skipEmptyLines: true });
+              const headers = (p.meta.fields || []).filter((h) => !FORBIDDEN.has(h.trim().toLowerCase()));
+              const rows = (p.data || []).map((r) => {
+                const o = {};
+                headers.forEach((h) => (o[h] = fmtReceipt(r[h])));
+                return o;
+              });
+              tables[short] = { headers, rows };
+            } else {
+              tables[short] = { headers: ["Value"], rows: [{ Value: txt }] };
+            }
+          }
+        } else if (lower.endsWith(".csv")) {
+          const txt = (await file.text()).trim();
+          const p = window.Papa.parse(txt, { header: true, skipEmptyLines: true });
+          const headers = (p.meta.fields || []).filter((h) => !FORBIDDEN.has(h.trim().toLowerCase()));
+          const rows = (p.data || []).map((r) => {
+            const o = {};
+            headers.forEach((h) => (o[h] = fmtReceipt(r[h])));
+            return o;
+          });
+          tables[lower] = { headers, rows };
+        }
+      }
+
+      if (Object.keys(tables).length === 0) {
+        sb.textContent = "⚠️ لم يتم العثور على ملفات CSV صالحة داخل الأرشيف.";
+        return;
+      }
+
+      renderAll(tables);
+      sb.textContent = `✅ تم فك ضغط وتحليل ${Object.keys(tables).length} ملفاً بنجاح ونسخ حزمة ALBER-CODEC-v1.2 للحافظة!`;
+    } catch (err) {
+      sb.textContent = "❌ خطأ في قراءة الملف: " + err.message;
+    }
+  }
+
+  function renderAll(tables) {
+    const f23 = (tables["data-file-23-user.csv"]?.rows || [])[0] || {};
+    const f9 = [...(tables["data-file-9-email-addresses.csv"]?.rows || [])].sort(
+      (a, b) => (parseUtc(a.email_added_utc) || 0) - (parseUtc(b.email_added_utc) || 0)
+    );
+    const f3 = [...(tables["data-file-3-billing-history.csv"]?.rows || [])].sort(
+      (a, b) => (parseUtc(a.timestamp_utc) || 0) - (parseUtc(b.timestamp_utc) || 0)
+    );
+    const f11 = [...(tables["data-file-11-ip-addresses.csv"]?.rows || [])].sort(
+      (a, b) => (parseUtc(a.first_recorded_utc) || 0) - (parseUtc(b.first_recorded_utc) || 0)
+    );
+    const f13 = [...(tables["data-file-13-location-history.csv"]?.rows || [])].sort(
+      (a, b) => (parseUtc(a.created_utc) || 0) - (parseUtc(b.created_utc) || 0)
+    );
+
+    // Module 52 Email Forensics
+    const first = f9[0];
+    const cMs = parseUtc(f23.created_utc);
+    document.getElementById("firstEmailBox").innerHTML = first
+      ? `<div class="mono-val text-white font-bold">${first.email_address}</div><div>أُضيف: ${first.email_added_utc || "-"} | موثق: <b>${first.is_verified}</b> | ملغي: <b class="${String(first.is_disabled).toLowerCase() === "true" ? "text-rose-400" : "text-emerald-400"}">${first.is_disabled}</b></div>`
+      : "لا يوجد سجل بريدات.";
+
+    document.getElementById("gapBox").innerHTML =
+      `<div>تاريخ الإنشاء: <span class="mono-val text-white">${f23.created_utc || "-"}</span></div>` +
+      `<div>الفارق حتى أول بريد: <b class="text-cyan-300">${first ? diffHuman(cMs, parseUtc(first.email_added_utc)) : "-"}</b></div>`;
+
+    const activeTF = f9.filter((r) => String(r.is_verified).toLowerCase() === "true" && String(r.is_disabled).toLowerCase() === "false");
+    const activeFF = f9.filter((r) => String(r.is_verified).toLowerCase() === "false" && String(r.is_disabled).toLowerCase() === "false");
+
+    document.getElementById("activeTrueFalseBox").innerHTML = activeTF.length
+      ? activeTF.map((r) => `<div>${r.email_address},True,False (${r.email_added_utc})</div>`).join("")
+      : "لا يوجد";
+    document.getElementById("activeFalseFalseBox").innerHTML = activeFF.length
+      ? activeFF.map((r) => `<div>${r.email_address},False,False (${r.email_added_utc})</div>`).join("")
+      : "لا يوجد";
+
+    let swaps = 0, counterPulls = 0;
+    const seen = new Set(), disableTimes = {};
+    const chainRows = [];
+    f9.forEach((r, i) => {
+      const em = (r.email_address || "").toLowerCase();
+      if (String(r.is_disabled).toLowerCase() === "true" && r.email_last_updated_utc) {
+        disableTimes[r.email_last_updated_utc] = (disableTimes[r.email_last_updated_utc] || 0) + 1;
+      }
+      if (i > 0) {
+        const prev = f9[i - 1];
+        if ((prev.email_address || "").toLowerCase() !== em) {
+          swaps++;
+          if (seen.has(em)) counterPulls++;
+        }
+        chainRows.push(
+          `<tr class="border-t border-slate-800"><td class="p-1.5">${i} ← ${i + 1}</td><td class="p-1.5 mono-val">${prev.email_address} ← ${r.email_address}</td><td class="p-1.5 mono-val">${r.email_added_utc || "-"}</td><td class="p-1.5">${diffHuman(parseUtc(prev.email_added_utc), parseUtc(r.email_added_utc))}</td></tr>`
+        );
+      }
+      seen.add(em);
+    });
+
+    const massEvents = Object.entries(disableTimes).filter(([, c]) => c >= 2);
+    document.getElementById("countersBox").innerHTML = `
+      <div class="bg-[#060a12] p-2 rounded-xl border border-slate-800"><div class="text-lg font-black">${f9.length}</div><div>إجمالي السجلات</div></div>
+      <div class="bg-[#060a12] p-2 rounded-xl border border-rose-500/40"><div class="text-lg font-black text-rose-400">${swaps}</div><div>مرات السحب</div></div>
+      <div class="bg-[#060a12] p-2 rounded-xl border border-amber-500/40"><div class="text-lg font-black text-amber-400">${counterPulls}</div><div>سحب عكسي</div></div>
+      <div class="bg-[#060a12] p-2 rounded-xl border border-purple-500/40"><div class="text-lg font-black text-purple-400">${massEvents.length}</div><div>إلغاء جماعي</div></div>
+      <div class="bg-[#060a12] p-2 rounded-xl border border-emerald-500/40"><div class="text-lg font-black text-emerald-400">${activeTF.length + activeFF.length}</div><div>بريدات نشطة (False)</div></div>`;
+
+    document.getElementById("massRevertBox").textContent = massEvents.length
+      ? "⚠️ أحداث إلغاء جماعي مرصودة: " + massEvents.map(([t, c]) => `${t} (${c} بريدات)`).join(" | ")
+      : "✅ لا توجد أحداث إلغاء جماعي متزامنة.";
+
+    document.getElementById("chainTableBox").innerHTML = chainRows.length
+      ? `<table class="w-full text-right"><thead><tr class="text-slate-400"><th class="p-1.5">#</th><th class="p-1.5">مين سحب على مين</th><th class="p-1.5">توقيت السحب (UTC)</th><th class="p-1.5">الفاصل الزمني</th></tr></thead><tbody>${chainRows.join("")}</tbody></table>`
+      : "لا توجد تنقلات بريدية.";
+
+    // Trust Score & Vars
+    const daysActive = cMs ? Math.max(0, Math.floor((Date.now() - cMs) / 86400000)) : 0;
+    const paidRows = f3.filter((r) => String(r.status || "").toLowerCase() === "succeeded");
+    const trustScore = daysActive * 2 + paidRows.length * 50;
+    const firstIp = f11[0]?.ip_address || "-";
+    const firstCountry = f13[0]?.country || "-";
+
+    document.getElementById("varsGridBox").innerHTML = `
+      <div class="bg-[#060a12] p-3 rounded-xl border border-slate-800"><b>اسم الحساب:</b> <span class="mono-val text-emerald-300">${f23.user_name || "-"}</span> (${f23.display_name || "-"})</div>
+      <div class="bg-[#060a12] p-3 rounded-xl border border-slate-800"><b>تاريخ الإنشاء:</b> <span class="mono-val">${f23.created_utc || "-"}</span></div>
+      <div class="bg-[#060a12] p-3 rounded-xl border border-slate-800"><b>أول IP وبلد:</b> <span class="mono-val">${firstIp}</span> | ${firstCountry}</div>
+      <div class="bg-[#060a12] p-3 rounded-xl border border-slate-800"><b>إجمالي Trust Score:</b> <span class="text-emerald-400 font-black">${trustScore.toLocaleString()}</span> (${daysActive} يوم × 2 + ${paidRows.length} شراء × 50)</div>
+      <div class="bg-[#060a12] p-3 rounded-xl border border-slate-800"><b>أقدم 5 فواتير:</b> <div class="mono-val text-amber-200 mt-1">${f3.slice(0, 5).map((r) => r.provider_payment_id).filter(Boolean).join(" , ") || "-"}</div></div>
+      <div class="bg-[#060a12] p-3 rounded-xl border border-slate-800"><b>أحدث 5 فواتير:</b> <div class="mono-val text-emerald-200 mt-1">${f3.slice(-5).map((r) => r.provider_payment_id).filter(Boolean).join(" , ") || "-"}</div></div>`;
+
+    // Build ALBER-CODEC-v1.2
+    const encTable = (k) => {
+      const t = tables[k];
+      if (!t || !t.rows.length) return `@${k}: EMPTY(0)`;
+      return `@SCHEMA[${t.headers.join("|")}] (ROWS=${t.rows.length})\n` +
+        t.rows.map((r, i) => `#${i + 1}:` + t.headers.map((h) => encVal(r[h])).join("|")).join(" // ");
+    };
+
+    fullCodecPayload = [
+      "=== [ALBER-CODEC-v1.2 : LOSSLESS FORENSIC ARCHIVE STREAM (0% TRUNCATION)] ===",
+      "[DICT]: @g=@gmail.com , @y=@yahoo.com , @h=@hotmail.com , @o=@outlook.com , @i=@icloud.com , ^GP=GooglePlayStore , ^AP=AppleAppStore , ^ST=Stripe , ^PP=PayPal , ^RC=RobloxCard , ^CS=CreditCard , ^OK=Succeeded , ^PN=Pending , ^FL=Failed , ^CH=Charge , ^RF=Refund , ^CB=Chargeback , ^RX= Robux , ^PM=Roblox Premium , ^1=True , ^0=False , ~2=202 , ~1=201",
+      `• USERNAME: ${f23.user_name || "-"} | DISPLAY: ${f23.display_name || "-"} | CREATED_UTC: ${f23.created_utc || "-"}`,
+      `• FIRST_IP: ${firstIp} | FIRST_COUNTRY: ${firstCountry} | TRUST_SCORE: ${trustScore}`,
+      `• ACTIVE_SUPPORT_EMAILS (True,False): ${activeTF.map((r) => r.email_address).join(" ; ") || "NONE"}`,
+      `• EARLIEST_5_RECEIPTS: ${f3.slice(0, 5).map((r) => `${r.provider_payment_id} (${r.timestamp_utc})`).join(" , ") || "NONE"}`,
+      `• LATEST_5_RECEIPTS: ${f3.slice(-5).map((r) => `${r.provider_payment_id} (${r.timestamp_utc})`).join(" , ") || "NONE"}`,
+      `[F9_EMAILS_ALL]: ${encTable("data-file-9-email-addresses.csv")}`,
+      `[F3_BILLING_ALL]: ${encTable("data-file-3-billing-history.csv")}`,
+      `[F16_MODERATION_ALL]: ${encTable("data-file-16-moderation-history.csv")}`,
+      `[F11_IPS_ALL]: ${encTable("data-file-11-ip-addresses.csv")}`,
+      `[F8_DEVICES_ALL]: ${encTable("data-file-8-device-history.csv")}`,
+      `[F10_GOVID_ALL]: ${encTable("data-file-10-government-ids.csv")}`,
+      "=== [END OF ALBER-CODEC-v1.2 STREAM] ==="
+    ].join("\n");
+
+    document.getElementById("codecArea").value = fullCodecPayload;
+    document.getElementById("topCopyBtn").disabled = false;
+    navigator.clipboard.writeText(fullCodecPayload).catch(() => {});
+  }
+
+  // ربط الدوال بـ window لتعمل الأزرار بعد التشفير
+  window.handleZipSelect = (e) => { if (e.target.files?.length) processFiles(e.target.files); };
+  window.handleDrop = (e) => {
+    e.preventDefault();
+    e.currentTarget.classList.remove("border-emerald-300");
+    if (e.dataTransfer.files?.length) processFiles(e.dataTransfer.files);
+  };
+  window.showPane = (id, btn) => {
+    document.querySelectorAll(".pane-box").forEach((el) => el.classList.add("hidden"));
+    document.getElementById(id).classList.remove("hidden");
+    document.querySelectorAll(".t-btn").forEach((b) => {
+      b.classList.remove("bg-emerald-500", "text-slate-950");
+      b.classList.add("text-slate-300");
+    });
+    btn.classList.add("bg-emerald-500", "text-slate-950");
+    btn.classList.remove("text-slate-300");
+  };
+  window.copyCodecNow = () => {
+    if (!fullCodecPayload) return;
+    navigator.clipboard.writeText(fullCodecPayload).catch(() => {});
+    alert("✅ تم نسخ حزمة ALBER-CODEC-v1.2 الكاملة! الصقها الآن في الشات.");
+  };
+  window.openAIEngine = (target) => {
+    if (fullCodecPayload) navigator.clipboard.writeText(fullCodecPayload).catch(() => {});
+    window.open(target === "chatgpt" ? "https://chatgpt.com/" : "https://gemini.google.com/app", "_blank");
+  };
+  window.runManualCheck = () => {
+    const url = document.getElementById("manualUrl").value.trim() || "غير محدد";
+    const reason = document.getElementById("manualReason").value;
+    const time = document.getElementById("manualTime").value;
+    const role = document.getElementById("manualRole").value;
+    const email = document.getElementById("manualEmail").value.trim() || "غير محدد";
+    const receipt = document.getElementById("manualReceipt").value.trim() || "لا يوجد";
+    document.getElementById("manualOut").value = [
+      "=== [MANUAL FORENSIC INTAKE REPORT] ===",
+      `• ACCOUNT: ${url}`,
+      `• REASON: ${reason.toUpperCase()}`,
+      `• WINDOW: ${time === "old" ? "EXPIRED (> 30 Days)" : "RECENT (<= 30 Days)"}`,
+      `• ROLE: ${role.toUpperCase()}`,
+      `• CONTACT_EMAIL: ${email}`,
+      `• RECEIPT: ${receipt}`
+    ].join("\n");
+  };
+  window.copyManualText = () => {
+    navigator.clipboard.writeText(document.getElementById("manualOut").value).catch(() => {});
+    alert("✅ تم نسخ التقرير اليدوي!");
+  };
+
+  window.addEventListener("DOMContentLoaded", () => {
+    checkKillSwitch();
+    window.runManualCheck();
+  });
+})();
