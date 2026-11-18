@@ -1,289 +1,183 @@
-(function () {
-  "use strict";
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alber Opbr — البوابة الذكية لفحص access-results.zip (Release 2.7)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Cairo', sans-serif; background-color: #060a12; color: #f1f5f9; }
+    .mono-val { font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: embed; }
+  </style>
+</head>
+<body class="min-h-screen bg-[#060a12] text-slate-100 p-3 sm:p-6 pb-24" oncontextmenu="return false;">
+  <div id="killScreen" class="hidden max-w-xl mx-auto mt-20 bg-rose-950/40 border border-rose-500/50 rounded-3xl p-8 text-center text-rose-300 font-bold text-base"></div>
 
-  const FORBIDDEN = new Set(["id", "user_id", "userid"]);
-  const DICT = [
-    ["@g", "@gmail.com"], ["@y", "@yahoo.com"], ["@h", "@hotmail.com"], ["@o", "@outlook.com"], ["@i", "@icloud.com"],
-    ["^GP", "GooglePlayStore"], ["^AP", "AppleAppStore"], ["^ST", "Stripe"], ["^PP", "PayPal"], ["^RC", "RobloxCard"], ["^CS", "CreditCard"],
-    ["^OK", "Succeeded"], ["^PN", "Pending"], ["^FL", "Failed"], ["^CH", "Charge"], ["^RF", "Refund"], ["^CB", "Chargeback"],
-    ["^RX", " Robux"], ["^PM", "Roblox Premium"], ["^1", "True"], ["^0", "False"], ["~2", "202"], ["~1", "201"]
-  ];
-  let fullCodecPayload = "";
+  <div id="appContent" class="max-w-7xl mx-auto space-y-5">
+    <!-- Top Header -->
+    <header class="bg-[#0c1322] border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xl">
+      <div>
+        <div class="flex flex-wrap items-center gap-2">
+          <h1 class="text-base sm:text-lg font-black text-white">Alber Opbr — البوابة الذكية لفحص <span class="mono-val text-emerald-400">access-results.zip</span> (Release 2.7)</h1>
+          <span class="text-xs font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-full font-bold">ALBER-CODEC-v1.2</span>
+        </div>
+        <p class="text-xs text-slate-400 mt-1">البريدات النشطة في الدعم • أول بريد ومقارنته بتاريخ الإنشاء • عدادات السحب وجدول مين سحب على مين</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="topCopyBtn" onclick="copyCodecNow()" disabled class="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs transition shadow-lg">
+          📋 نسخ الكود الكامل للشات
+        </button>
+        <button onclick="openAIEngine('chatgpt')" class="bg-[#10a37f] hover:opacity-90 text-white font-bold px-3 py-2.5 rounded-xl text-xs transition">🚀 ChatGPT</button>
+        <button onclick="openAIEngine('gemini')" class="bg-[#4f46e5] hover:opacity-90 text-white font-bold px-3 py-2.5 rounded-xl text-xs transition">💎 Gemini</button>
+      </div>
+    </header>
 
-  // 1. حماية الاختصارات + زر الإيقاف عن بُعد (status.json)
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "F12" || (e.ctrlKey && e.shiftKey && ["I", "J", "C"].includes(e.key.toUpperCase())) || (e.ctrlKey && e.key.toUpperCase() === "U")) {
-      e.preventDefault();
-    }
-  });
+    <!-- Main Upload Card -->
+    <section class="bg-[#0c1322] border-2 border-emerald-500/40 rounded-3xl p-5 shadow-2xl space-y-4">
+      <div onclick="document.getElementById('zipInput').click()"
+           ondragover="event.preventDefault(); this.classList.add('border-emerald-300')"
+           ondragleave="this.classList.remove('border-emerald-300')"
+           ondrop="handleDrop(event)"
+           class="border-2 border-dashed border-emerald-500/70 hover:border-emerald-400 bg-emerald-950/20 rounded-2xl p-6 text-center cursor-pointer transition">
+        <input type="file" id="zipInput" class="hidden" accept=".zip,application/zip,.csv,.txt" multiple onchange="handleZipSelect(event)" />
+        <div class="inline-block bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm sm:text-base px-6 py-3.5 rounded-2xl shadow-lg mb-2 cursor-pointer">
+          📂 اضغط هنا أو اسحب ملف access-results.zip لوضعه داخل البوابة
+        </div>
+        <p class="text-xs text-slate-300">يفك ضغط الـ 24 ملفاً محلياً داخل المتصفح (JSZip) بدون حذف أي سطر ويحذف id و user_id تلقائياً</p>
+      </div>
+      <div id="statusBar" class="bg-[#060a12] border border-slate-800 rounded-xl px-4 py-2.5 text-xs font-bold text-amber-300">
+        في انتظار وضع ملف access-results.zip داخل البوابة...
+      </div>
+    </section>
 
-  async function checkKillSwitch() {
-    try {
-      const res = await fetch("./status.json?t=" + Date.now(), { cache: "no-store" });
-      if (!res.ok) return true;
-      const cfg = await res.json();
-      if (cfg && cfg.active === false) {
-        document.getElementById("appContent").classList.add("hidden");
-        const ks = document.getElementById("killScreen");
-        ks.textContent = "⛔ " + (cfg.message || "البوابة متوقفة حالياً بأمر المطور.");
-        ks.classList.remove("hidden");
-        return false;
-      }
-    } catch (_) {}
-    return true;
-  }
+    <!-- Navigation Tabs -->
+    <nav class="bg-[#0c1322] border border-slate-800 rounded-2xl p-1.5 flex flex-wrap gap-1.5">
+      <button id="btnTabCodec" onclick="showPane('p-codec', this)" class="t-btn flex-1 py-2 px-3 rounded-xl text-xs font-extrabold bg-emerald-500 text-slate-950">1. الكود المشفر للشات (ALBER-CODEC-v1.2)</button>
+      <button id="btnTabM52" onclick="showPane('p-m52', this)" class="t-btn flex-1 py-2 px-3 rounded-xl text-xs font-extrabold text-slate-300 hover:bg-slate-800">2. فحص سحب البريدات والدعم</button>
+      <button id="btnTabVars" onclick="showPane('p-vars', this)" class="t-btn flex-1 py-2 px-3 rounded-xl text-xs font-extrabold text-slate-300 hover:bg-slate-800">3. المتغيرات والـ Trust Score</button>
+      <button id="btnTabManual" onclick="showPane('p-manual', this)" class="t-btn flex-1 py-2 px-3 rounded-xl text-xs font-extrabold text-slate-300 hover:bg-slate-800">4. فحص يدوي احتياطي (بدون ملف ZIP)</button>
+    </nav>
 
-  function fmtReceipt(v) {
-    return String(v ?? "").trim()
-      .replace(/\bg-(GPA\.\d{4}-\d{4}-\d{4}-\d{4,5})\b/gi, "$1")
-      .replace(/\bapple-(\d{5,25})\b/gi, "$1")
-      .replace(/\bstripe-(pi_[a-zA-Z0-9_]+)\b/gi, "$1");
-  }
+    <!-- Pane 1: Codec -->
+    <section id="p-codec" class="pane-box bg-[#0c1322] border border-emerald-500/40 rounded-2xl p-4 space-y-3">
+      <div class="flex flex-wrap justify-between items-center gap-2">
+        <div>
+          <h3 class="text-sm font-black text-emerald-300">الكود المشفر النهائي الجاهز للذكاء الاصطناعي (ALBER-CODEC-v1.2)</h3>
+          <p class="text-xs text-slate-400">انسخ هذا الكود والصقه في الشات ليقوم بعرض أدلة الفحص الجنائي الكاملة وكتابة التذكرة</p>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="copyCodecNow()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs transition">📋 نسخ الكود الآن</button>
+          <button onclick="openAIEngine('gemini')" class="bg-[#4f46e5] hover:opacity-90 text-white font-bold px-3 py-2 rounded-xl text-xs transition">💎 افتح Gemini</button>
+          <button onclick="openAIEngine('chatgpt')" class="bg-[#10a37f] hover:opacity-90 text-white font-bold px-3 py-2 rounded-xl text-xs transition">🚀 افتح ChatGPT</button>
+        </div>
+      </div>
+      <textarea id="codecArea" readonly class="w-full h-96 bg-[#060a12] border border-slate-800 rounded-xl p-3 text-xs mono-val text-emerald-200" dir="ltr" placeholder="الكود المشفر سيظهر هنا ويُنسخ تلقائياً بمجرد اختيار ملف access-results.zip..."></textarea>
+    </section>
 
-  function encVal(v) {
-    let s = String(v ?? "").trim();
-    for (const [tk, rw] of DICT) s = s.split(rw).join(tk);
-    return s;
-  }
+    <!-- Pane 2: Deep Email Forensics -->
+    <section id="p-m52" class="pane-box hidden space-y-4">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-[#0c1322] border border-rose-500/40 rounded-2xl p-4 space-y-2">
+          <h3 class="text-sm font-black text-rose-300">أول بريد مسجل وحالته</h3>
+          <div id="firstEmailBox" class="text-xs text-slate-300">اختر ملف الأرشيف أعلاه لبدء الفحص التلقائي...</div>
+        </div>
+        <div class="bg-[#0c1322] border border-cyan-500/40 rounded-2xl p-4 space-y-2">
+          <h3 class="text-sm font-black text-cyan-300">مقارنة أول بريد مع تاريخ إنشاء الحساب</h3>
+          <div id="gapBox" class="text-xs text-slate-300">اختر ملف الأرشيف أعلاه لبدء الفحص التلقائي...</div>
+        </div>
+      </div>
+      <div class="bg-[#0c1322] border border-emerald-500/40 rounded-2xl p-4 space-y-3">
+        <h3 class="text-sm font-black text-emerald-300">البريدات التي ما زالت تعمل في الدعم والسجل (email_address,is_verified,is_disabled)</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="bg-[#060a12] border border-emerald-500/30 rounded-xl p-3">
+            <div class="text-xs font-bold text-emerald-400 mb-1.5">1. نشط وموثق في الدعم (True,False):</div>
+            <div id="activeTrueFalseBox" class="mono-val text-xs text-emerald-200 space-y-1">لا توجد بيانات حتى الآن</div>
+          </div>
+          <div class="bg-[#060a12] border border-amber-500/30 rounded-xl p-3">
+            <div class="text-xs font-bold text-amber-400 mb-1.5">2. نشط غير موثق (False,False):</div>
+            <div id="activeFalseFalseBox" class="mono-val text-xs text-amber-200 space-y-1">لا توجد بيانات حتى الآن</div>
+          </div>
+        </div>
+      </div>
+      <div class="bg-[#0c1322] border border-amber-500/40 rounded-2xl p-4 space-y-3">
+        <h3 class="text-sm font-black text-amber-300">عدادات السحب وجدول مين سحب على مين والفترات الزمنية</h3>
+        <div id="countersBox" class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-xs">
+          <div class="bg-[#060a12] p-2 rounded-xl border border-slate-800"><div class="text-lg font-black">-</div><div>إجمالي السجلات</div></div>
+          <div class="bg-[#060a12] p-2 rounded-xl border border-rose-500/40"><div class="text-lg font-black text-rose-400">-</div><div>مرات السحب</div></div>
+          <div class="bg-[#060a12] p-2 rounded-xl border border-amber-500/40"><div class="text-lg font-black text-amber-400">-</div><div>سحب عكسي</div></div>
+          <div class="bg-[#060a12] p-2 rounded-xl border border-purple-500/40"><div class="text-lg font-black text-purple-400">-</div><div>إلغاء جماعي</div></div>
+          <div class="bg-[#060a12] p-2 rounded-xl border border-emerald-500/40"><div class="text-lg font-black text-emerald-400">-</div><div>بريدات نشطة (False)</div></div>
+        </div>
+        <div id="massRevertBox" class="text-xs text-rose-300 bg-rose-950/30 border border-rose-500/30 rounded-xl p-3">في انتظار رفع الملف...</div>
+        <div id="chainTableBox" class="overflow-x-auto bg-[#060a12] border border-slate-800 rounded-xl p-2 text-xs">في انتظار رفع الملف...</div>
+      </div>
+    </section>
 
-  function parseUtc(ts) {
-    if (!ts) return null;
-    const ms = Date.parse(String(ts).trim().replace(" ", "T") + "Z");
-    return isNaN(ms) ? null : ms;
-  }
+    <!-- Pane 3: Variables & Trust Score -->
+    <section id="p-vars" class="pane-box hidden bg-[#0c1322] border border-slate-800 rounded-2xl p-4 space-y-4">
+      <h3 class="text-sm font-black text-emerald-300">المتغيرات المستخرجة تلقائياً ونقاط الثقة (Trust Score)</h3>
+      <div id="varsGridBox" class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+        <div class="text-slate-400">يرجى رفع ملف access-results.zip لتوليد المتغيرات تلقائياً.</div>
+      </div>
+    </section>
 
-  function diffHuman(msA, msB) {
-    if (msA == null || msB == null) return "-";
-    const d = Math.abs(msB - msA);
-    const days = Math.floor(d / 86400000);
-    const hrs = Math.floor((d % 86400000) / 3600000);
-    const mins = Math.floor((d % 3600000) / 60000);
-    return days > 0 ? `${days} يوم و ${hrs} ساعة` : `${hrs} ساعة و ${mins} دقيقة`;
-  }
+    <!-- Pane 4: Manual Fallback -->
+    <section id="p-manual" class="pane-box hidden bg-[#0c1322] border border-slate-800 rounded-2xl p-5 space-y-4">
+      <div class="border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-black text-amber-300">مسار الإدخال اليدوي الاحتياطي (لمن لا يملك ملف access-results.zip)</h3>
+        <p class="text-xs text-slate-400 mt-1">استخدم هذا القسم فقط إذا لم يكن لديك ملف ZIP، لتوليد تقرير تشخيصي لـ Gemini أو ChatGPT</p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="space-y-3 text-xs">
+          <div>
+            <label class="block font-bold text-slate-300 mb-1">رابط الاستعادة أو اسم الحساب:</label>
+            <input type="text" id="manualUrl" placeholder="https://www.roblox.com/...identifier=USERNAME أو اسم الحساب" oninput="runManualCheck()" class="w-full bg-[#060a12] border border-slate-800 rounded-lg p-2.5 text-white" />
+          </div>
+          <div>
+            <label class="block font-bold text-slate-300 mb-1">سبب تعذر الوصول للحساب:</label>
+            <select id="manualReason" onchange="runManualCheck()" class="w-full bg-[#060a12] border border-slate-800 rounded-lg p-2.5 text-white">
+              <option value="portal_codes">نسيت كلمة المرور / لا تصلني أكواد الاستعادة على البريد</option>
+              <option value="lost_2fa">فقدان تطبيق 2FA وضياع أكواد النسخ الاحتياطي</option>
+              <option value="hijacked">الحساب مسروق وتم تغيير البريد الإلكتروني</option>
+              <option value="banned">الحساب متبند أو محظور (Banned / Moderated)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-300 mb-1">المدة منذ المشكلة:</label>
+            <select id="manualTime" onchange="runManualCheck()" class="w-full bg-[#060a12] border border-slate-800 rounded-lg p-2.5 text-white">
+              <option value="recent">أقل من 30 يوماً (حديث)</option>
+              <option value="old">أكثر من 30 يوماً (قديم - يلزم مسار الفوترة)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-300 mb-1">طبيعة الملكية:</label>
+            <select id="manualRole" onchange="runManualCheck()" class="w-full bg-[#060a12] border border-slate-800 rounded-lg p-2.5 text-white">
+              <option value="master">صاحب الحساب الأصلي (Master)</option>
+              <option value="buyer">مشتري للحساب (Buyer)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-300 mb-1">البريد الفعلي للتواصل:</label>
+            <input type="text" id="manualEmail" placeholder="example@gmail.com" oninput="runManualCheck()" class="w-full bg-[#060a12] border border-slate-800 rounded-lg p-2.5 text-white" />
+          </div>
+          <div>
+            <label class="block font-bold text-slate-300 mb-1">رقم إيصال الشحن أو كارت الشحن (GPA / PIN):</label>
+            <input type="text" id="manualReceipt" placeholder="GPA.xxxx... أو كود كارت روبلوكس" oninput="runManualCheck()" class="w-full bg-[#060a12] border border-slate-800 rounded-lg p-2.5 text-white" />
+          </div>
+        </div>
+        <div class="space-y-3">
+          <label class="block font-bold text-xs text-slate-300">التقرير اليدوي الناتج للشات:</label>
+          <textarea id="manualOut" readonly class="w-full h-72 bg-[#060a12] border border-slate-800 rounded-xl p-3 text-xs mono-val text-emerald-200" dir="ltr"></textarea>
+          <button onclick="copyManualText()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl text-xs transition">📋 نسخ التقرير اليدوي للشات</button>
+        </div>
+      </div>
+    </section>
+  </div>
 
-  async function processFiles(fileList) {
-    if (!(await checkKillSwitch())) return;
-    const sb = document.getElementById("statusBar");
-    sb.textContent = "⏳ جاري فك ضغط الأرشيف وتحليل الجداول جنائياً...";
-    const tables = {};
-
-    try {
-      for (const file of fileList) {
-        const lower = file.name.toLowerCase();
-        if (lower.endsWith(".zip")) {
-          const zip = await window.JSZip.loadAsync(file);
-          for (const [path, entry] of Object.entries(zip.files)) {
-            if (entry.dir || path.includes("..") || path.startsWith("/")) continue;
-            const short = path.split("/").pop().toLowerCase();
-            if (!short.endsWith(".csv") && !short.endsWith(".txt")) continue;
-            const txt = (await entry.async("string")).trim();
-            if (!txt) continue;
-            if (short.endsWith(".csv")) {
-              const p = window.Papa.parse(txt, { header: true, skipEmptyLines: true });
-              const headers = (p.meta.fields || []).filter((h) => !FORBIDDEN.has(h.trim().toLowerCase()));
-              const rows = (p.data || []).map((r) => {
-                const o = {};
-                headers.forEach((h) => (o[h] = fmtReceipt(r[h])));
-                return o;
-              });
-              tables[short] = { headers, rows };
-            } else {
-              tables[short] = { headers: ["Value"], rows: [{ Value: txt }] };
-            }
-          }
-        } else if (lower.endsWith(".csv")) {
-          const txt = (await file.text()).trim();
-          const p = window.Papa.parse(txt, { header: true, skipEmptyLines: true });
-          const headers = (p.meta.fields || []).filter((h) => !FORBIDDEN.has(h.trim().toLowerCase()));
-          const rows = (p.data || []).map((r) => {
-            const o = {};
-            headers.forEach((h) => (o[h] = fmtReceipt(r[h])));
-            return o;
-          });
-          tables[lower] = { headers, rows };
-        }
-      }
-
-      if (Object.keys(tables).length === 0) {
-        sb.textContent = "⚠️ لم يتم العثور على ملفات CSV صالحة داخل الأرشيف.";
-        return;
-      }
-
-      renderAll(tables);
-      sb.textContent = `✅ تم فك ضغط وتحليل ${Object.keys(tables).length} ملفاً بنجاح ونسخ حزمة ALBER-CODEC-v1.2 للحافظة!`;
-    } catch (err) {
-      sb.textContent = "❌ خطأ في قراءة الملف: " + err.message;
-    }
-  }
-
-  function renderAll(tables) {
-    const f23 = (tables["data-file-23-user.csv"]?.rows || [])[0] || {};
-    const f9 = [...(tables["data-file-9-email-addresses.csv"]?.rows || [])].sort(
-      (a, b) => (parseUtc(a.email_added_utc) || 0) - (parseUtc(b.email_added_utc) || 0)
-    );
-    const f3 = [...(tables["data-file-3-billing-history.csv"]?.rows || [])].sort(
-      (a, b) => (parseUtc(a.timestamp_utc) || 0) - (parseUtc(b.timestamp_utc) || 0)
-    );
-    const f11 = [...(tables["data-file-11-ip-addresses.csv"]?.rows || [])].sort(
-      (a, b) => (parseUtc(a.first_recorded_utc) || 0) - (parseUtc(b.first_recorded_utc) || 0)
-    );
-    const f13 = [...(tables["data-file-13-location-history.csv"]?.rows || [])].sort(
-      (a, b) => (parseUtc(a.created_utc) || 0) - (parseUtc(b.created_utc) || 0)
-    );
-
-    // Module 52 Email Forensics
-    const first = f9[0];
-    const cMs = parseUtc(f23.created_utc);
-    document.getElementById("firstEmailBox").innerHTML = first
-      ? `<div class="mono-val text-white font-bold">${first.email_address}</div><div>أُضيف: ${first.email_added_utc || "-"} | موثق: <b>${first.is_verified}</b> | ملغي: <b class="${String(first.is_disabled).toLowerCase() === "true" ? "text-rose-400" : "text-emerald-400"}">${first.is_disabled}</b></div>`
-      : "لا يوجد سجل بريدات.";
-
-    document.getElementById("gapBox").innerHTML =
-      `<div>تاريخ الإنشاء: <span class="mono-val text-white">${f23.created_utc || "-"}</span></div>` +
-      `<div>الفارق حتى أول بريد: <b class="text-cyan-300">${first ? diffHuman(cMs, parseUtc(first.email_added_utc)) : "-"}</b></div>`;
-
-    const activeTF = f9.filter((r) => String(r.is_verified).toLowerCase() === "true" && String(r.is_disabled).toLowerCase() === "false");
-    const activeFF = f9.filter((r) => String(r.is_verified).toLowerCase() === "false" && String(r.is_disabled).toLowerCase() === "false");
-
-    document.getElementById("activeTrueFalseBox").innerHTML = activeTF.length
-      ? activeTF.map((r) => `<div>${r.email_address},True,False (${r.email_added_utc})</div>`).join("")
-      : "لا يوجد";
-    document.getElementById("activeFalseFalseBox").innerHTML = activeFF.length
-      ? activeFF.map((r) => `<div>${r.email_address},False,False (${r.email_added_utc})</div>`).join("")
-      : "لا يوجد";
-
-    let swaps = 0, counterPulls = 0;
-    const seen = new Set(), disableTimes = {};
-    const chainRows = [];
-    f9.forEach((r, i) => {
-      const em = (r.email_address || "").toLowerCase();
-      if (String(r.is_disabled).toLowerCase() === "true" && r.email_last_updated_utc) {
-        disableTimes[r.email_last_updated_utc] = (disableTimes[r.email_last_updated_utc] || 0) + 1;
-      }
-      if (i > 0) {
-        const prev = f9[i - 1];
-        if ((prev.email_address || "").toLowerCase() !== em) {
-          swaps++;
-          if (seen.has(em)) counterPulls++;
-        }
-        chainRows.push(
-          `<tr class="border-t border-slate-800"><td class="p-1.5">${i} ← ${i + 1}</td><td class="p-1.5 mono-val">${prev.email_address} ← ${r.email_address}</td><td class="p-1.5 mono-val">${r.email_added_utc || "-"}</td><td class="p-1.5">${diffHuman(parseUtc(prev.email_added_utc), parseUtc(r.email_added_utc))}</td></tr>`
-        );
-      }
-      seen.add(em);
-    });
-
-    const massEvents = Object.entries(disableTimes).filter(([, c]) => c >= 2);
-    document.getElementById("countersBox").innerHTML = `
-      <div class="bg-[#060a12] p-2 rounded-xl border border-slate-800"><div class="text-lg font-black">${f9.length}</div><div>إجمالي السجلات</div></div>
-      <div class="bg-[#060a12] p-2 rounded-xl border border-rose-500/40"><div class="text-lg font-black text-rose-400">${swaps}</div><div>مرات السحب</div></div>
-      <div class="bg-[#060a12] p-2 rounded-xl border border-amber-500/40"><div class="text-lg font-black text-amber-400">${counterPulls}</div><div>سحب عكسي</div></div>
-      <div class="bg-[#060a12] p-2 rounded-xl border border-purple-500/40"><div class="text-lg font-black text-purple-400">${massEvents.length}</div><div>إلغاء جماعي</div></div>
-      <div class="bg-[#060a12] p-2 rounded-xl border border-emerald-500/40"><div class="text-lg font-black text-emerald-400">${activeTF.length + activeFF.length}</div><div>بريدات نشطة (False)</div></div>`;
-
-    document.getElementById("massRevertBox").textContent = massEvents.length
-      ? "⚠️ أحداث إلغاء جماعي مرصودة: " + massEvents.map(([t, c]) => `${t} (${c} بريدات)`).join(" | ")
-      : "✅ لا توجد أحداث إلغاء جماعي متزامنة.";
-
-    document.getElementById("chainTableBox").innerHTML = chainRows.length
-      ? `<table class="w-full text-right"><thead><tr class="text-slate-400"><th class="p-1.5">#</th><th class="p-1.5">مين سحب على مين</th><th class="p-1.5">توقيت السحب (UTC)</th><th class="p-1.5">الفاصل الزمني</th></tr></thead><tbody>${chainRows.join("")}</tbody></table>`
-      : "لا توجد تنقلات بريدية.";
-
-    // Trust Score & Vars
-    const daysActive = cMs ? Math.max(0, Math.floor((Date.now() - cMs) / 86400000)) : 0;
-    const paidRows = f3.filter((r) => String(r.status || "").toLowerCase() === "succeeded");
-    const trustScore = daysActive * 2 + paidRows.length * 50;
-    const firstIp = f11[0]?.ip_address || "-";
-    const firstCountry = f13[0]?.country || "-";
-
-    document.getElementById("varsGridBox").innerHTML = `
-      <div class="bg-[#060a12] p-3 rounded-xl border border-slate-800"><b>اسم الحساب:</b> <span class="mono-val text-emerald-300">${f23.user_name || "-"}</span> (${f23.display_name || "-"})</div>
-      <div class="bg-[#060a12] p-3 rounded-xl border border-slate-800"><b>تاريخ الإنشاء:</b> <span class="mono-val">${f23.created_utc || "-"}</span></div>
-      <div class="bg-[#060a12] p-3 rounded-xl border border-slate-800"><b>أول IP وبلد:</b> <span class="mono-val">${firstIp}</span> | ${firstCountry}</div>
-      <div class="bg-[#060a12] p-3 rounded-xl border border-slate-800"><b>إجمالي Trust Score:</b> <span class="text-emerald-400 font-black">${trustScore.toLocaleString()}</span> (${daysActive} يوم × 2 + ${paidRows.length} شراء × 50)</div>
-      <div class="bg-[#060a12] p-3 rounded-xl border border-slate-800"><b>أقدم 5 فواتير:</b> <div class="mono-val text-amber-200 mt-1">${f3.slice(0, 5).map((r) => r.provider_payment_id).filter(Boolean).join(" , ") || "-"}</div></div>
-      <div class="bg-[#060a12] p-3 rounded-xl border border-slate-800"><b>أحدث 5 فواتير:</b> <div class="mono-val text-emerald-200 mt-1">${f3.slice(-5).map((r) => r.provider_payment_id).filter(Boolean).join(" , ") || "-"}</div></div>`;
-
-    // Build ALBER-CODEC-v1.2
-    const encTable = (k) => {
-      const t = tables[k];
-      if (!t || !t.rows.length) return `@${k}: EMPTY(0)`;
-      return `@SCHEMA[${t.headers.join("|")}] (ROWS=${t.rows.length})\n` +
-        t.rows.map((r, i) => `#${i + 1}:` + t.headers.map((h) => encVal(r[h])).join("|")).join(" // ");
-    };
-
-    fullCodecPayload = [
-      "=== [ALBER-CODEC-v1.2 : LOSSLESS FORENSIC ARCHIVE STREAM (0% TRUNCATION)] ===",
-      "[DICT]: @g=@gmail.com , @y=@yahoo.com , @h=@hotmail.com , @o=@outlook.com , @i=@icloud.com , ^GP=GooglePlayStore , ^AP=AppleAppStore , ^ST=Stripe , ^PP=PayPal , ^RC=RobloxCard , ^CS=CreditCard , ^OK=Succeeded , ^PN=Pending , ^FL=Failed , ^CH=Charge , ^RF=Refund , ^CB=Chargeback , ^RX= Robux , ^PM=Roblox Premium , ^1=True , ^0=False , ~2=202 , ~1=201",
-      `• USERNAME: ${f23.user_name || "-"} | DISPLAY: ${f23.display_name || "-"} | CREATED_UTC: ${f23.created_utc || "-"}`,
-      `• FIRST_IP: ${firstIp} | FIRST_COUNTRY: ${firstCountry} | TRUST_SCORE: ${trustScore}`,
-      `• ACTIVE_SUPPORT_EMAILS (True,False): ${activeTF.map((r) => r.email_address).join(" ; ") || "NONE"}`,
-      `• EARLIEST_5_RECEIPTS: ${f3.slice(0, 5).map((r) => `${r.provider_payment_id} (${r.timestamp_utc})`).join(" , ") || "NONE"}`,
-      `• LATEST_5_RECEIPTS: ${f3.slice(-5).map((r) => `${r.provider_payment_id} (${r.timestamp_utc})`).join(" , ") || "NONE"}`,
-      `[F9_EMAILS_ALL]: ${encTable("data-file-9-email-addresses.csv")}`,
-      `[F3_BILLING_ALL]: ${encTable("data-file-3-billing-history.csv")}`,
-      `[F16_MODERATION_ALL]: ${encTable("data-file-16-moderation-history.csv")}`,
-      `[F11_IPS_ALL]: ${encTable("data-file-11-ip-addresses.csv")}`,
-      `[F8_DEVICES_ALL]: ${encTable("data-file-8-device-history.csv")}`,
-      `[F10_GOVID_ALL]: ${encTable("data-file-10-government-ids.csv")}`,
-      "=== [END OF ALBER-CODEC-v1.2 STREAM] ==="
-    ].join("\n");
-
-    document.getElementById("codecArea").value = fullCodecPayload;
-    document.getElementById("topCopyBtn").disabled = false;
-    navigator.clipboard.writeText(fullCodecPayload).catch(() => {});
-  }
-
-  // ربط الدوال بـ window لتعمل الأزرار بعد التشفير
-  window.handleZipSelect = (e) => { if (e.target.files?.length) processFiles(e.target.files); };
-  window.handleDrop = (e) => {
-    e.preventDefault();
-    e.currentTarget.classList.remove("border-emerald-300");
-    if (e.dataTransfer.files?.length) processFiles(e.dataTransfer.files);
-  };
-  window.showPane = (id, btn) => {
-    document.querySelectorAll(".pane-box").forEach((el) => el.classList.add("hidden"));
-    document.getElementById(id).classList.remove("hidden");
-    document.querySelectorAll(".t-btn").forEach((b) => {
-      b.classList.remove("bg-emerald-500", "text-slate-950");
-      b.classList.add("text-slate-300");
-    });
-    btn.classList.add("bg-emerald-500", "text-slate-950");
-    btn.classList.remove("text-slate-300");
-  };
-  window.copyCodecNow = () => {
-    if (!fullCodecPayload) return;
-    navigator.clipboard.writeText(fullCodecPayload).catch(() => {});
-    alert("✅ تم نسخ حزمة ALBER-CODEC-v1.2 الكاملة! الصقها الآن في الشات.");
-  };
-  window.openAIEngine = (target) => {
-    if (fullCodecPayload) navigator.clipboard.writeText(fullCodecPayload).catch(() => {});
-    window.open(target === "chatgpt" ? "https://chatgpt.com/" : "https://gemini.google.com/app", "_blank");
-  };
-  window.runManualCheck = () => {
-    const url = document.getElementById("manualUrl").value.trim() || "غير محدد";
-    const reason = document.getElementById("manualReason").value;
-    const time = document.getElementById("manualTime").value;
-    const role = document.getElementById("manualRole").value;
-    const email = document.getElementById("manualEmail").value.trim() || "غير محدد";
-    const receipt = document.getElementById("manualReceipt").value.trim() || "لا يوجد";
-    document.getElementById("manualOut").value = [
-      "=== [MANUAL FORENSIC INTAKE REPORT] ===",
-      `• ACCOUNT: ${url}`,
-      `• REASON: ${reason.toUpperCase()}`,
-      `• WINDOW: ${time === "old" ? "EXPIRED (> 30 Days)" : "RECENT (<= 30 Days)"}`,
-      `• ROLE: ${role.toUpperCase()}`,
-      `• CONTACT_EMAIL: ${email}`,
-      `• RECEIPT: ${receipt}`
-    ].join("\n");
-  };
-  window.copyManualText = () => {
-    navigator.clipboard.writeText(document.getElementById("manualOut").value).catch(() => {});
-    alert("✅ تم نسخ التقرير اليدوي!");
-  };
-
-  window.addEventListener("DOMContentLoaded", () => {
-    checkKillSwitch();
-    window.runManualCheck();
-  });
-})();
+  <script src="core.min.js"></script>
+</body>
+</html>
