@@ -1,3 +1,5 @@
+let cachedSkillPrompt = null;
+
 export default {
   async fetch(request, env, ctx) {
     const allowedOrigin = "https://goky40.github.io";
@@ -58,9 +60,16 @@ export default {
         }
       }
 
-      const sysPrompt = String(env.SKILL_PROMPT || "").trim();
-      if (!env.GEMINI_API_KEY || !sysPrompt) {
-        return new Response(JSON.stringify({ error: "Missing secrets" }), {
+      if (!cachedSkillPrompt) {
+        const fromEnv = String(env.SKILL_PROMPT || "").trim();
+        const fromKv = env.ALBER_CACHE
+          ? String((await env.ALBER_CACHE.get("alber_skill_prompt")) || "").trim()
+          : "";
+        cachedSkillPrompt = fromEnv || fromKv;
+      }
+
+      if (!env.GEMINI_API_KEY || !cachedSkillPrompt) {
+        return new Response(JSON.stringify({ error: "Missing secrets or skill prompt" }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -79,9 +88,9 @@ export default {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            systemInstruction: { parts: [{ text: sysPrompt }] },
+            systemInstruction: { parts: [{ text: cachedSkillPrompt }] },
             contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.25, maxOutputTokens: 900 },
+            generationConfig: { temperature: 0.25, maxOutputTokens: 2048 },
           }),
         }
       );
