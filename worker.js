@@ -75,7 +75,7 @@ export default {
         });
       }
 
-      const model = env.GEMINI_MODEL || "gemini-2.5-flash";
+      const model = env.GEMINI_MODEL || "gemini-3.8-flash";
       const prompt = [
         `Issue Type: ${issueType}`,
         contextSummary ? `Diagnostic Context:\n${contextSummary}` : "",
