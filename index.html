@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Alber Opbr — البوابة الذكية للفحص الجنائي الشامل (Release 2.9.1)</title>
+  <title>Alber Opbr — البوابة الذكية للفحص الجنائي الشامل (Release 2.9.2)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -22,13 +22,16 @@
       <div>
         <div class="flex flex-wrap items-center gap-2">
           <h1 class="text-base sm:text-lg font-black text-white">Alber Opbr — البوابة الجنائية الشاملة <span class="mono-val text-emerald-400">access-results.zip</span></h1>
-          <span class="text-xs font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-full font-bold">Release 2.9.1</span>
+          <span class="text-xs font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-full font-bold">Release 2.9.2</span>
         </div>
-        <p class="text-xs text-slate-400 mt-1">فحص جنائي محلي لكل ملفات الأرشيف • كشف تعارض الملكية والعمر • أهلية البوابة • مسودة الدعم (≤ 650 حرفاً)</p>
+        <p class="text-xs text-slate-400 mt-1">فحص جنائي محلي لكل ملفات الأرشيف • مساعد ذكي مدمج بلا حدود • أهلية البوابة • مسودة الدعم (≤ 650 حرفاً)</p>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         <button id="topCopyBtn" onclick="copyCodecNow()" disabled class="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs transition shadow-lg">
           📋 نسخ حزمة الفحص
+        </button>
+        <button onclick="openBuiltInAssistant()" class="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black px-3.5 py-2.5 rounded-xl text-xs transition shadow-lg">
+          🤖 المساعد الذكي
         </button>
         <button onclick="openAIEngine('chatgpt')" class="bg-[#10a37f] hover:opacity-90 text-white font-bold px-3 py-2.5 rounded-xl text-xs transition">🚀 ChatGPT</button>
         <button onclick="openAIEngine('gemini')" class="bg-[#4f46e5] hover:opacity-90 text-white font-bold px-3 py-2.5 rounded-xl text-xs transition">💎 Gemini</button>
@@ -48,7 +51,7 @@
         <p class="text-xs text-slate-300">معالجة محلية 100% داخل متصفحك • فحص أمان المسارات • حذف المعرفات الرقمية تلقائياً</p>
       </div>
       <div id="statusBar" class="bg-[#060a12] border border-slate-800 rounded-xl px-4 py-2.5 text-xs font-bold text-amber-300">
-        في انتظار وضع ملف access-results.zip داخل البوابة...
+        في انتظار وضع ملف access-results.zip داخل البوابة (أو استخدم المساعد الذكي مباشرة من التبويب رقم 6)...
       </div>
     </section>
 
@@ -58,6 +61,7 @@
       <button id="btnTabM52" onclick="showPane('p-m52', this)" class="t-btn flex-1 py-2 px-3 rounded-xl text-xs font-extrabold text-slate-300 hover:bg-slate-800">3. سحب البريدات والدعم</button>
       <button id="btnTabCodec" onclick="showPane('p-codec', this)" class="t-btn flex-1 py-2 px-3 rounded-xl text-xs font-extrabold text-slate-300 hover:bg-slate-800">4. الحزمة المضغوطة للشات</button>
       <button id="btnTabManual" onclick="showPane('p-manual', this)" class="t-btn flex-1 py-2 px-3 rounded-xl text-xs font-extrabold text-slate-300 hover:bg-slate-800">5. فحص يدوي (بدون ZIP)</button>
+      <button id="btnTabAiChat" onclick="showPane('p-aichat', this)" class="t-btn flex-1 py-2 px-3 rounded-xl text-xs font-extrabold text-cyan-300 hover:bg-slate-800 border border-cyan-500/30">6. المساعد الذكي المباشر 🤖</button>
     </nav>
 
     <section id="p-forensic" class="pane-box space-y-4">
@@ -95,6 +99,9 @@
       </div>
 
       <div class="flex flex-wrap items-center justify-end gap-2">
+        <button onclick="openBuiltInAssistant(true)" class="bg-indigo-500 hover:bg-indigo-400 text-white font-black px-4 py-2.5 rounded-xl text-xs transition shadow">
+          🤖 تحليل النتيجة بالمساعد الذكي
+        </button>
         <button onclick="runForensicEngine(); runEligibilityCheck();" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs transition shadow">
           🔍 تحديث الفحص الجنائي
         </button>
@@ -266,9 +273,10 @@
       <div class="flex flex-wrap justify-between items-center gap-2">
         <div>
           <h3 class="text-sm font-black text-emerald-300">حزمة الأدلة المضغوطة الجاهزة للشات</h3>
-          <p class="text-xs text-slate-400">انسخ هذه الحزمة والصقها في الشات إذا أردت متابعة إضافية مع المساعد الذكي</p>
+          <p class="text-xs text-slate-400">انسخ هذه الحزمة أو أرسلها مباشرة للمساعد الذكي المدمج في البوابة</p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
+          <button onclick="openBuiltInAssistant(true)" class="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs transition">🤖 أرسل الحزمة للمساعد الذكي</button>
           <button onclick="copyCodecNow()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs transition">📋 نسخ الحزمة الآن</button>
           <button onclick="openAIEngine('gemini')" class="bg-[#4f46e5] hover:opacity-90 text-white font-bold px-3 py-2 rounded-xl text-xs transition">💎 افتح Gemini</button>
           <button onclick="openAIEngine('chatgpt')" class="bg-[#10a37f] hover:opacity-90 text-white font-bold px-3 py-2 rounded-xl text-xs transition">🚀 افتح ChatGPT</button>
@@ -323,12 +331,221 @@
         <div class="space-y-3">
           <label class="block font-bold text-xs text-slate-300">التقرير اليدوي الناتج:</label>
           <textarea id="manualOut" readonly class="w-full h-72 bg-[#060a12] border border-slate-800 rounded-xl p-3 text-xs mono-val text-emerald-200" dir="ltr"></textarea>
-          <button onclick="copyManualText()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl text-xs transition">📋 نسخ التقرير اليدوي</button>
+          <div class="flex gap-2">
+            <button onclick="copyManualText()" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl text-xs transition">📋 نسخ التقرير اليدوي</button>
+            <button onclick="openBuiltInAssistant(false, true)" class="flex-1 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black py-2.5 rounded-xl text-xs transition">🤖 أرسل للمساعد الذكي</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="p-aichat" class="pane-box hidden bg-[#0c1322] border border-cyan-500/40 rounded-2xl p-4 sm:p-5 space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="text-sm font-black text-cyan-300">المساعد الذكي المباشر — Alber Opbr AI</h3>
+          <p class="text-xs text-slate-400 mt-0.5">متصل مباشرةً بخادم التشخيص السحابي بدون حدود رسائل • يقرأ سياق الفحص تلقائياً عند توفره</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span id="aiWorkerBadge" class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">متصل بالخادم</span>
+          <button type="button" onclick="attachZipSummaryToChat()" class="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold px-3 py-1.5 rounded-xl text-xs transition">
+            📎 إرفاق ملخص الفحص الحالي
+          </button>
+          <button type="button" onclick="clearAlberChat()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-3 py-1.5 rounded-xl text-xs transition">
+            🗑️ مسح المحادثة
+          </button>
+        </div>
+      </div>
+
+      <div id="aiChatMessages" class="bg-[#060a12] border border-slate-800 rounded-2xl p-4 min-h-[320px] max-h-[55vh] overflow-y-auto space-y-3 text-xs leading-relaxed">
+        <div class="bg-[#0c1322] border border-slate-800 rounded-xl p-3.5 text-slate-200">
+          <div class="text-[11px] font-bold text-cyan-400 mb-1">Alber Opbr AI</div>
+          أهلاً بك. اكتب مشكلتك في حساب Roblox بالتفصيل (أو اضغط "إرفاق ملخص الفحص الحالي" بعد رفع ملف access-results.zip)، وسأشخص حالتك وأساعدك في صياغة رد الدعم خطوة بخطوة.
+        </div>
+      </div>
+
+      <div class="space-y-2">
+        <div class="flex flex-col sm:flex-row gap-2">
+          <textarea id="aiChatInput" rows="2" placeholder="اكتب رسالتك هنا... (اضغط Enter للإرسال أو Shift+Enter لسطر جديد)" class="flex-1 bg-[#060a12] border border-slate-700 focus:border-cyan-400 rounded-xl p-3 text-xs text-white outline-none resize-y"></textarea>
+          <button id="aiChatSendBtn" type="button" onclick="sendBuiltInChat()" class="bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-slate-950 font-black px-6 py-3 rounded-xl text-xs transition shrink-0">
+            إرسال 🚀
+          </button>
+        </div>
+        <div class="text-[11px] text-slate-400">
+          تنبيه أمني: لا تشارك كلمات المرور أو أكواد التحقق بخطوتين (2SV) أو Backup Codes أو بيانات البطاقات البنكية الكاملة.
         </div>
       </div>
     </section>
   </div>
 
   <script src="core.min.js"></script>
+  <script>
+    (function () {
+      const ALBER_WORKER_URL = "https://alberopbr.goky40.workers.dev";
+      const chatHistory = [];
+
+      function buildCurrentContextSummary() {
+        const parts = [];
+        const kpiUser = (document.getElementById("kpiUser")?.textContent || "").trim();
+        const kpiScore = (document.getElementById("kpiScore")?.textContent || "").trim();
+        const kpiOwnership = (document.getElementById("kpiOwnership")?.textContent || "").trim();
+        const role = document.getElementById("fRole")?.value || "";
+        const issue = document.getElementById("fIssue")?.value || "";
+        const win = document.getElementById("fWindow")?.value || "";
+        const codec = (document.getElementById("codecArea")?.value || "").trim();
+        const manual = (document.getElementById("manualOut")?.value || "").trim();
+
+        if (kpiUser && kpiUser !== "-") parts.push(`Account: ${kpiUser}`);
+        if (kpiScore && kpiScore !== "-") parts.push(`Evidence Score: ${kpiScore}`);
+        if (kpiOwnership && kpiOwnership !== "-") parts.push(`Ownership Support: ${kpiOwnership}`);
+        if (role || issue || win) parts.push(`Role=${role}, Issue=${issue}, Window=${win}`);
+        if (codec) {
+          parts.push(`ALBER-CODEC Extract:\n${codec.slice(0, 1400)}`);
+        } else if (manual) {
+          parts.push(`Manual Diagnostic Report:\n${manual.slice(0, 1400)}`);
+        }
+        return parts.join("\n").slice(0, 2000);
+      }
+
+      function appendChatBubble(role, text, isError = false) {
+        const box = document.getElementById("aiChatMessages");
+        if (!box) return;
+        const wrap = document.createElement("div");
+        if (role === "user") {
+          wrap.className = "bg-cyan-500/15 border border-cyan-500/35 rounded-xl p-3.5 text-slate-100 mr-auto max-w-[90%] whitespace-pre-wrap";
+        } else if (isError) {
+          wrap.className = "bg-rose-950/40 border border-rose-500/40 rounded-xl p-3.5 text-rose-200 whitespace-pre-wrap";
+        } else {
+          wrap.className = "bg-[#0c1322] border border-slate-800 rounded-xl p-3.5 text-slate-200 whitespace-pre-wrap";
+        }
+
+        const header = document.createElement("div");
+        header.className = role === "user"
+          ? "text-[11px] font-bold text-cyan-300 mb-1"
+          : (isError ? "text-[11px] font-bold text-rose-400 mb-1" : "text-[11px] font-bold text-emerald-400 mb-1");
+        header.textContent = role === "user" ? "أنت" : (isError ? "تنبيه النظام" : "Alber Opbr AI");
+
+        const body = document.createElement("div");
+        body.textContent = text;
+
+        wrap.appendChild(header);
+        wrap.appendChild(body);
+        box.appendChild(wrap);
+        box.scrollTop = box.scrollHeight;
+      }
+
+      window.openBuiltInAssistant = function (autoSendZip = false, autoSendManual = false) {
+        const btn = document.getElementById("btnTabAiChat");
+        if (typeof window.showPane === "function" && btn) {
+          window.showPane("p-aichat", btn);
+        } else {
+          document.querySelectorAll(".pane-box").forEach((el) => el.classList.add("hidden"));
+          document.getElementById("p-aichat")?.classList.remove("hidden");
+        }
+
+        if (autoSendZip) {
+          const codec = (document.getElementById("codecArea")?.value || "").trim();
+          const input = document.getElementById("aiChatInput");
+          if (codec && input) {
+            input.value = "حلل حزمة الفحص الجنائي المرفقة من access-results.zip، ووضح وضع الإيميلات النشطة وسجل السحب والخطوة الأنسب للدعم.";
+            window.sendBuiltInChat();
+          }
+        } else if (autoSendManual) {
+          const manual = (document.getElementById("manualOut")?.value || "").trim();
+          const input = document.getElementById("aiChatInput");
+          if (manual && input) {
+            input.value = "راجع التقرير اليدوي المرفق لحالتي وحدد المسار الصحيح وصيغة التواصل المناسبة مع الدعم.";
+            window.sendBuiltInChat();
+          }
+        }
+      };
+
+      window.attachZipSummaryToChat = function () {
+        const ctx = buildCurrentContextSummary();
+        const input = document.getElementById("aiChatInput");
+        if (!ctx) {
+          appendChatBubble("bot", "لا توجد بيانات فحص محلية مرفوعة بعد. يمكنك كتابة مشكلتك مباشرة أو رفع ملف access-results.zip أولاً.", true);
+          return;
+        }
+        if (input && !input.value.trim()) {
+          input.value = "حلل بيانات الفحص المرفقة لحسابي وحدد الخطوة التالية بدقة.";
+        }
+        appendChatBubble("bot", "تم ربط ملخص الفحص الحالي بالمحادثة وجاهز للإرسال مع رسالتك.");
+      };
+
+      window.clearAlberChat = function () {
+        chatHistory.length = 0;
+        const box = document.getElementById("aiChatMessages");
+        if (box) {
+          box.innerHTML = "";
+          appendChatBubble("bot", "تم مسح المحادثة. اكتب استفسارك الجديد وسأساعدك فوراً.");
+        }
+      };
+
+      window.sendBuiltInChat = async function () {
+        const input = document.getElementById("aiChatInput");
+        const sendBtn = document.getElementById("aiChatSendBtn");
+        const badge = document.getElementById("aiWorkerBadge");
+        if (!input || !sendBtn) return;
+
+        const userText = input.value.trim();
+        if (!userText) return;
+
+        const issueType = document.getElementById("fIssue")?.value || "general";
+        const recentHistory = chatHistory.slice(-6).map((m) => `${m.role}: ${m.text}`).join("\n");
+        const currentCtx = buildCurrentContextSummary();
+        const combinedContext = [currentCtx, recentHistory ? `Recent Conversation:\n${recentHistory}` : ""]
+          .filter(Boolean)
+          .join("\n\n")
+          .slice(0, 2000);
+
+        appendChatBubble("user", userText);
+        chatHistory.push({ role: "User", text: userText });
+        input.value = "";
+        sendBtn.disabled = true;
+        sendBtn.textContent = "جاري التحليل...";
+
+        try {
+          const res = await fetch(ALBER_WORKER_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message: userText,
+              issueType,
+              contextSummary: combinedContext,
+            }),
+          });
+
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            if (badge) {
+              badge.textContent = data.maintenance ? "صيانة مؤقتة" : "تعذر الاتصال";
+              badge.className = "text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30";
+            }
+            appendChatBubble("bot", data.error || data.message || "تعذر الحصول على رد من الخادم حالياً.", true);
+          } else {
+            const reply = String(data.reply || "").trim() || "لم يصل رد نصي من النموذج.";
+            if (badge) {
+              badge.textContent = data.cached ? "متصل (استجابة فورية)" : "متصل بالخادم";
+              badge.className = "text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30";
+            }
+            appendChatBubble("bot", reply);
+            chatHistory.push({ role: "Assistant", text: reply });
+          }
+        } catch (err) {
+          appendChatBubble("bot", "حدث خطأ في الشبكة أثناء الاتصال بخادم المساعد الذكي.", true);
+        } finally {
+          sendBtn.disabled = false;
+          sendBtn.textContent = "إرسال 🚀";
+        }
+      };
+
+      document.getElementById("aiChatInput")?.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          window.sendBuiltInChat();
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
