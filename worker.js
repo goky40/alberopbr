@@ -37,9 +37,9 @@ export default {
       }
 
       const body = await request.json().catch(() => ({}));
-      const issueType = String(body.issueType || "general").trim().slice(0, 80);
-      const contextSummary = String(body.contextSummary || "").trim().slice(0, 1500);
-      const userMessage = String(body.message || "").trim().slice(0, 1200);
+      const issueType = String(body.issueType || "general").trim().slice(0, 60);
+      const contextSummary = String(body.contextSummary || "").trim().slice(0, 600);
+      const userMessage = String(body.message || "").trim().slice(0, 600);
 
       if (!userMessage && !contextSummary) {
         return new Response(JSON.stringify({ error: "Empty query" }), {
@@ -70,8 +70,9 @@ export default {
         );
       }
 
-      const rawKey = `${issueType}|${contextSummary.toLowerCase()}|${userMessage.toLowerCase().replace(/\s+/g, " ")}`;
-      const kvKey = `alber_q:${await sha256Hex(rawKey)}`;
+      // مفتاح كاش مرن يقلل استهلاك الحصة في الأسئلة المتشابهة
+      const normalizedMsg = `${issueType}|${userMessage.toLowerCase().replace(/\s+/g, " ").trim()}`;
+      const kvKey = `alber_q:${await sha256Hex(normalizedMsg)}`;
 
       if (env.ALBER_CACHE) {
         const cached = await env.ALBER_CACHE.get(kvKey);
@@ -82,26 +83,33 @@ export default {
         }
       }
 
-      const primaryModel = env.GEMINI_MODEL || "gemini-3.8-flash";
-      const modelsToTry = [...new Set([primaryModel, "gemini-2.5-flash-lite", "gemini-2.5-pro"])];
-
+      const compactSystemPrompt = cachedSkillPrompt.slice(0, 3500);
       const prompt = [
-        `Issue Type: ${issueType}`,
-        contextSummary ? `Diagnostic Context:\n${contextSummary}` : "",
-        `User Request:\n${userMessage}`,
+        `Issue: ${issueType}`,
+        contextSummary ? `Context:\n${contextSummary}` : "",
+        `Message:\n${userMessage}`,
       ].filter(Boolean).join("\n\n");
 
+      const configuredModel = String(env.GEMINI_MODEL || "").trim();
+      const geminiModels = [
+        ...new Set([
+          configuredModel,
+          "gemini-3.8-flash",
+          "gemini-3.1-pro-preview",
+        ].filter(Boolean)),
+      ];
+
       const payloadBody = JSON.stringify({
-        systemInstruction: { parts: [{ text: cachedSkillPrompt }] },
+        systemInstruction: { parts: [{ text: compactSystemPrompt }] },
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.25, maxOutputTokens: 2048 },
+        generationConfig: { temperature: 0.25, maxOutputTokens: 900 },
       });
 
       let gRes = null;
-      let lastErrTxt = "";
+      let primaryErrTxt = "";
       let hitRateLimit = false;
 
-      for (const m of modelsToTry) {
+      for (const m of geminiModels) {
         gRes = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${env.GEMINI_API_KEY}`,
           {
@@ -112,24 +120,60 @@ export default {
         );
 
         if (gRes.ok) break;
-        lastErrTxt = await gRes.text();
+
+        const errTxt = await gRes.text();
+        if (!primaryErrTxt) {
+          primaryErrTxt = `[${m} -> ${gRes.status}] ${errTxt}`;
+        }
 
         if (gRes.status === 429) {
           hitRateLimit = true;
-          await new Promise((r) => setTimeout(r, 400));
+          await new Promise((r) => setTimeout(r, 350));
           continue;
         }
+
         if (![503, 404].includes(gRes.status)) break;
       }
 
-      if (!gRes || !gRes.ok) {
-        const statusCode = hitRateLimit && (!gRes || gRes.status === 429) ? 429 : 502;
+      let reply = "";
+
+      if (gRes && gRes.ok) {
+        const gJson = await gRes.json();
+        reply =
+          gJson?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("").trim() || "";
+      } else if (hitRateLimit && env.FALLBACK_API_URL && env.FALLBACK_API_KEY) {
+        // مزود احتياطي مجاني متوافق مع OpenAI Chat Completions عند ضرب 429
+        const fbRes = await fetch(env.FALLBACK_API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${env.FALLBACK_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: env.FALLBACK_MODEL || "openrouter/free",
+            messages: [
+              { role: "system", content: compactSystemPrompt },
+              { role: "user", content: prompt },
+            ],
+            temperature: 0.25,
+            max_tokens: 900,
+          }),
+        });
+
+        if (fbRes.ok) {
+          const fbJson = await fbRes.json();
+          reply = String(fbJson?.choices?.[0]?.message?.content || "").trim();
+        }
+      }
+
+      if (!reply) {
+        const statusCode = hitRateLimit ? 429 : 502;
         return new Response(
           JSON.stringify({
             error: hitRateLimit
-              ? "تم الوصول لحد الطلبات المؤقت (Rate limit) على Gemini API. انتظر قليلاً أو راجع الفوترة."
+              ? "الحد المجاني الحالي على Gemini API ممتلئ مؤقتاً (Rate limit). انتظر قليلاً أو أضف مزوداً احتياطياً مجانياً."
               : "Gemini API error",
-            details: lastErrTxt.slice(0, 300),
+            details: primaryErrTxt.slice(0, 400),
           }),
           {
             status: statusCode,
@@ -138,12 +182,7 @@ export default {
         );
       }
 
-      const gJson = await gRes.json();
-      const reply =
-        gJson?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("").trim() ||
-        "تعذر توليد رد مناسب حالياً.";
-
-      if (env.ALBER_CACHE && reply) {
+      if (env.ALBER_CACHE) {
         ctx.waitUntil(env.ALBER_CACHE.put(kvKey, reply, { expirationTtl: 604800 }));
       }
 
