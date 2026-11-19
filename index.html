@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Alber Opbr — البوابة الذكية لفحص access-results.zip (Release 2.7)</title>
+  <title>Alber Opbr — البوابة الذكية للفحص الجنائي الشامل (Release 2.9.1)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -22,14 +22,14 @@
     <header class="bg-[#0c1322] border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xl">
       <div>
         <div class="flex flex-wrap items-center gap-2">
-          <h1 class="text-base sm:text-lg font-black text-white">Alber Opbr — البوابة الذكية لفحص <span class="mono-val text-emerald-400">access-results.zip</span> (Release 2.7)</h1>
-          <span class="text-xs font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-full font-bold">ALBER-CODEC-v1.2</span>
+          <h1 class="text-base sm:text-lg font-black text-white">Alber Opbr — البوابة الجنائية الشاملة <span class="mono-val text-emerald-400">access-results.zip</span></h1>
+          <span class="text-xs font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-full font-bold">Release 2.9.1</span>
         </div>
-        <p class="text-xs text-slate-400 mt-1">البريدات النشطة في الدعم • أول بريد ومقارنته بتاريخ الإنشاء • عدادات السحب وجدول مين سحب على مين</p>
+        <p class="text-xs text-slate-400 mt-1">فحص جنائي محلي لكل ملفات الأرشيف • كشف تعارض الملكية والعمر • أهلية البوابة • مسودة الدعم (≤ 650 حرفاً)</p>
       </div>
       <div class="flex items-center gap-2">
         <button id="topCopyBtn" onclick="copyCodecNow()" disabled class="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs transition shadow-lg">
-          📋 نسخ الكود الكامل للشات
+          📋 نسخ حزمة الفحص
         </button>
         <button onclick="openAIEngine('chatgpt')" class="bg-[#10a37f] hover:opacity-90 text-white font-bold px-3 py-2.5 rounded-xl text-xs transition">🚀 ChatGPT</button>
         <button onclick="openAIEngine('gemini')" class="bg-[#4f46e5] hover:opacity-90 text-white font-bold px-3 py-2.5 rounded-xl text-xs transition">💎 Gemini</button>
@@ -45,9 +45,9 @@
            class="border-2 border-dashed border-emerald-500/70 hover:border-emerald-400 bg-emerald-950/20 rounded-2xl p-6 text-center cursor-pointer transition">
         <input type="file" id="zipInput" class="hidden" accept=".zip,application/zip,.csv,.txt" multiple onchange="handleZipSelect(event)" />
         <div class="inline-block bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm sm:text-base px-6 py-3.5 rounded-2xl shadow-lg mb-2 cursor-pointer">
-          📂 اضغط هنا أو اسحب ملف access-results.zip لوضعه داخل البوابة
+          📂 اضغط هنا أو اسحب ملف access-results.zip لبدء الفحص الجنائي الشامل
         </div>
-        <p class="text-xs text-slate-300">يفك ضغط الـ 24 ملفاً محلياً داخل المتصفح (JSZip) بدون حذف أي سطر ويحذف id و user_id تلقائياً</p>
+        <p class="text-xs text-slate-300">معالجة محلية 100% داخل متصفحك • فحص أمان المسارات • حذف المعرفات الرقمية تلقائياً</p>
       </div>
       <div id="statusBar" class="bg-[#060a12] border border-slate-800 rounded-xl px-4 py-2.5 text-xs font-bold text-amber-300">
         في انتظار وضع ملف access-results.zip داخل البوابة...
@@ -56,37 +56,194 @@
 
     <!-- Navigation Tabs -->
     <nav class="bg-[#0c1322] border border-slate-800 rounded-2xl p-1.5 flex flex-wrap gap-1.5">
-      <button id="btnTabCodec" onclick="showPane('p-codec', this)" class="t-btn flex-1 py-2 px-3 rounded-xl text-xs font-extrabold bg-emerald-500 text-slate-950">1. الكود المشفر للشات (ALBER-CODEC-v1.2)</button>
-      <button id="btnTabM52" onclick="showPane('p-m52', this)" class="t-btn flex-1 py-2 px-3 rounded-xl text-xs font-extrabold text-slate-300 hover:bg-slate-800">2. فحص سحب البريدات والدعم</button>
-      <button id="btnTabVars" onclick="showPane('p-vars', this)" class="t-btn flex-1 py-2 px-3 rounded-xl text-xs font-extrabold text-slate-300 hover:bg-slate-800">3. المتغيرات والـ Trust Score</button>
-      <button id="btnTabManual" onclick="showPane('p-manual', this)" class="t-btn flex-1 py-2 px-3 rounded-xl text-xs font-extrabold text-slate-300 hover:bg-slate-800">4. فحص يدوي احتياطي (بدون ملف ZIP)</button>
+      <button id="btnTabForensic" onclick="showPane('p-forensic', this)" class="t-btn flex-1 py-2 px-3 rounded-xl text-xs font-extrabold bg-emerald-500 text-slate-950">1. التقرير الجنائي والتذكرة</button>
+      <button id="btnTabDeep" onclick="showPane('p-deep', this)" class="t-btn flex-1 py-2 px-3 rounded-xl text-xs font-extrabold text-slate-300 hover:bg-slate-800">2. الأجهزة والهوية والخط الزمني</button>
+      <button id="btnTabM52" onclick="showPane('p-m52', this)" class="t-btn flex-1 py-2 px-3 rounded-xl text-xs font-extrabold text-slate-300 hover:bg-slate-800">3. سحب البريدات والدعم</button>
+      <button id="btnTabCodec" onclick="showPane('p-codec', this)" class="t-btn flex-1 py-2 px-3 rounded-xl text-xs font-extrabold text-slate-300 hover:bg-slate-800">4. الحزمة المضغوطة للشات</button>
+      <button id="btnTabManual" onclick="showPane('p-manual', this)" class="t-btn flex-1 py-2 px-3 rounded-xl text-xs font-extrabold text-slate-300 hover:bg-slate-800">5. فحص يدوي (بدون ZIP)</button>
     </nav>
 
-    <!-- Pane 1: Codec -->
-    <section id="p-codec" class="pane-box bg-[#0c1322] border border-emerald-500/40 rounded-2xl p-4 space-y-3">
-      <div class="flex flex-wrap justify-between items-center gap-2">
+    <!-- Pane 1: Forensic Diagnosis, Eligibility & Ticket -->
+    <section id="p-forensic" class="pane-box space-y-4">
+      <!-- Quick KPI Cards -->
+      <div id="kpiStrip" class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+        <div class="bg-[#0c1322] border border-slate-800 rounded-2xl p-3.5"><div class="text-slate-400">الحساب وتاريخ الإنشاء</div><div id="kpiUser" class="font-black text-white mt-1">-</div></div>
+        <div class="bg-[#0c1322] border border-slate-800 rounded-2xl p-3.5"><div class="text-slate-400">قوة ملف الأدلة (Score)</div><div id="kpiScore" class="font-black text-emerald-400 mt-1">-</div></div>
+        <div class="bg-[#0c1322] border border-slate-800 rounded-2xl p-3.5"><div class="text-slate-400">تصنيف دعم الملكية</div><div id="kpiOwnership" class="font-black text-cyan-300 mt-1">-</div></div>
+        <div class="bg-[#0c1322] border border-slate-800 rounded-2xl p-3.5"><div class="text-slate-400">مستوى المخاطر</div><div id="kpiRisk" class="font-black text-amber-300 mt-1">-</div></div>
+      </div>
+
+      <!-- Case Parameters -->
+      <div class="bg-[#0c1322] border border-slate-800 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
         <div>
-          <h3 class="text-sm font-black text-emerald-300">الكود المشفر النهائي الجاهز للذكاء الاصطناعي (ALBER-CODEC-v1.2)</h3>
-          <p class="text-xs text-slate-400">انسخ هذا الكود والصقه في الشات ليقوم بعرض أدلة الفحص الجنائي الكاملة وكتابة التذكرة</p>
+          <label class="block font-bold text-slate-300 mb-1">طبيعة الملكية:</label>
+          <select id="fRole" onchange="runForensicEngine()" class="w-full bg-[#060a12] border border-slate-700 rounded-xl p-2.5 text-white">
+            <option value="master">المالك الأصلي للحساب (Master)</option>
+            <option value="buyer">مشتري للحساب (Buyer)</option>
+          </select>
         </div>
-        <div class="flex gap-2">
-          <button onclick="copyCodecNow()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs transition">📋 نسخ الكود الآن</button>
-          <button onclick="openAIEngine('gemini')" class="bg-[#4f46e5] hover:opacity-90 text-white font-bold px-3 py-2 rounded-xl text-xs transition">💎 افتح Gemini</button>
-          <button onclick="openAIEngine('chatgpt')" class="bg-[#10a37f] hover:opacity-90 text-white font-bold px-3 py-2 rounded-xl text-xs transition">🚀 افتح ChatGPT</button>
+        <div>
+          <label class="block font-bold text-slate-300 mb-1">المشكلة الحالية:</label>
+          <select id="fIssue" onchange="runForensicEngine()" class="w-full bg-[#060a12] border border-slate-700 rounded-xl p-2.5 text-white">
+            <option value="hijacked">اختراق / تغيير البريد وفقدان الوصول</option>
+            <option value="lost_2fa">قفل التحقق بخطوتين (2FA / Backup Codes)</option>
+            <option value="portal_codes">البوابة لا تقبل الإيميل أو لا تصل الأكواد</option>
+            <option value="banned">الحساب محظور / متبند (Banned)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-300 mb-1">المدة منذ المشكلة:</label>
+          <select id="fWindow" onchange="runForensicEngine()" class="w-full bg-[#060a12] border border-slate-700 rounded-xl p-2.5 text-white">
+            <option value="recent">أقل من 30 يوماً (حديث)</option>
+            <option value="old">أكثر من 30 يوماً (قديم — مسار الفوترة)</option>
+          </select>
         </div>
       </div>
-      <textarea id="codecArea" readonly class="w-full h-96 bg-[#060a12] border border-slate-800 rounded-xl p-3 text-xs mono-val text-emerald-200" dir="ltr" placeholder="الكود المشفر سيظهر هنا ويُنسخ تلقائياً بمجرد اختيار ملف access-results.zip..."></textarea>
+
+      <!-- Action Buttons Bar -->
+      <div class="flex flex-wrap items-center justify-end gap-2">
+        <button onclick="runForensicEngine(); runEligibilityCheck();" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs transition shadow">
+          🔍 تحديث الفحص الجنائي
+        </button>
+        <button id="exportMdBtn" onclick="exportForensicMarkdown()" disabled class="bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs transition shadow">
+          ⬇️ تصدير التقرير الكامل (.md)
+        </button>
+      </div>
+
+      <div id="forensicAlertBox" class="hidden rounded-2xl p-4 text-xs font-bold leading-relaxed"></div>
+
+      <!-- Eligibility Checker (Device vs Wi-Fi vs Verified Email) -->
+      <div class="bg-[#0c1322] border border-indigo-500/40 rounded-2xl p-4 space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 class="text-sm font-black text-indigo-300">فحص أهلية بوابة الاسترداد الذاتية (الجهاز vs الشبكة vs البريد الموثق)</h3>
+            <p class="text-xs text-slate-400">يقارن نوع جهازك الحالي تلقائياً بسجل الأجهزة في الأرشيف مع مؤشرات الرصد العملي (30 يوماً للجهاز / 15 يوماً للشبكة)</p>
+          </div>
+          <span id="autoDeviceMatchBadge" class="text-xs font-bold px-3 py-1 rounded-xl bg-slate-800 text-slate-300">فئة الجهاز الحالي: جاري الفحص...</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          <div class="bg-[#060a12] border border-slate-800 rounded-xl p-3 space-y-2">
+            <div class="font-bold text-cyan-300">1. محور الجهاز (بصمة المتصفح/التوكن)</div>
+            <select id="elSameDevice" onchange="runEligibilityCheck()" class="w-full bg-[#0c1322] border border-slate-700 rounded-lg p-2 text-white">
+              <option value="yes">نفس الجهاز والمتصفح المعتاد</option>
+              <option value="no">جهاز جديد أو تم مسح بيانات المتصفح</option>
+            </select>
+            <input type="number" id="elDeviceDays" min="0" placeholder="الأيام منذ آخر دخول من هذا الجهاز" oninput="runEligibilityCheck()" class="w-full bg-[#0c1322] border border-slate-700 rounded-lg p-2 text-white" />
+            <div id="elDeviceBadge" class="text-[11px] font-bold text-slate-400">الحالة: بيانات غير كافية</div>
+          </div>
+
+          <div class="bg-[#060a12] border border-slate-800 rounded-xl p-3 space-y-2">
+            <div class="font-bold text-amber-300">2. محور الشبكة (نطاق IP الواي فاي)</div>
+            <select id="elSameWifi" onchange="runEligibilityCheck()" class="w-full bg-[#0c1322] border border-slate-700 rounded-lg p-2 text-white">
+              <option value="yes">نفس شبكة الواي فاي المنزلية (نفس المزود)</option>
+              <option value="no">شبكة مختلفة أو VPN / بيانات هاتف جديدة</option>
+            </select>
+            <input type="number" id="elWifiDays" min="0" placeholder="الأيام منذ آخر دخول من هذه الشبكة" oninput="runEligibilityCheck()" class="w-full bg-[#0c1322] border border-slate-700 rounded-lg p-2 text-white" />
+            <div id="elWifiBadge" class="text-[11px] font-bold text-slate-400">الحالة: بيانات غير كافية</div>
+          </div>
+
+          <div class="bg-[#060a12] border border-slate-800 rounded-xl p-3 space-y-2">
+            <div class="font-bold text-emerald-300">3. محور البريد الموثق في الدعم</div>
+            <select id="elEmailAccess" onchange="runEligibilityCheck()" class="w-full bg-[#0c1322] border border-slate-700 rounded-lg p-2 text-white">
+              <option value="active_verified">أملك وصولاً لبريد موثق نشط حالياً (True,False)</option>
+              <option value="old_verified">أملك بريداً موثقاً قديماً تم تغييره/إلغاؤه</option>
+              <option value="billing_only">أملك بريد فواتير/شحن فقط غير مربوط بالحساب</option>
+              <option value="none">لا أملك وصولاً لأي بريد</option>
+            </select>
+            <div id="elZipHardwareNote" class="text-[11px] text-slate-400">ارفع ملف ZIP لعرض إحصائيات الأجهزة والشبكة من السجل.</div>
+            <div id="elEmailBadge" class="text-[11px] font-bold text-slate-400">الحالة: بانتظار التقييم</div>
+          </div>
+        </div>
+        <div id="elVerdictBox" class="bg-[#060a12] border border-slate-800 rounded-xl p-3 text-xs leading-relaxed text-slate-300">
+          أدخل عدد الأيام منذ آخر دخول للجهاز والشبكة لعرض حكم الأهلية التفصيلي.
+        </div>
+      </div>
+
+      <!-- 3-Part Forensic Assessment -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 text-xs">
+        <div class="bg-[#0c1322] border border-emerald-500/40 rounded-2xl p-4 space-y-2">
+          <h3 class="text-sm font-black text-emerald-400">1. نقاط القوة (الأدلة المؤكدة)</h3>
+          <ul id="forensicStrengths" class="list-disc pr-4 space-y-1.5 text-slate-200">
+            <li>ارفع ملف access-results.zip لبدء التقييم الجنائي التلقائي.</li>
+          </ul>
+        </div>
+        <div class="bg-[#0c1322] border border-rose-500/40 rounded-2xl p-4 space-y-2">
+          <h3 class="text-sm font-black text-rose-400">2. العيوب والثغرات وتضارب الأدلة</h3>
+          <ul id="forensicRisks" class="list-disc pr-4 space-y-1.5 text-slate-200">
+            <li>في انتظار بيانات الأرشيف...</li>
+          </ul>
+        </div>
+        <div class="bg-[#0c1322] border border-cyan-500/40 rounded-2xl p-4 space-y-2">
+          <h3 class="text-sm font-black text-cyan-400">3. خطة التحسين والمسار الموصى به</h3>
+          <ul id="forensicPlan" class="list-disc pr-4 space-y-1.5 text-slate-200">
+            <li>في انتظار بيانات الأرشيف...</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Support Ticket Draft -->
+      <div class="bg-[#0c1322] border border-amber-500/40 rounded-2xl p-4 space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 class="text-sm font-black text-amber-300">مسودة رسالة الدعم الجاهزة (المرحلة الأولى — حد 650 حرفاً)</h3>
+            <p class="text-xs text-slate-400">منقاة تلقائياً من المعرفات الرقمية ومضبوطة على المسار المناسب لحالتك</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="ticketCharCount" class="mono-val text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-emerald-300">0 / 650</span>
+            <button onclick="copyTicketDraft()" class="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-4 py-2 rounded-xl text-xs transition">📋 نسخ مسودة الدعم</button>
+          </div>
+        </div>
+        <textarea id="ticketDraftArea" readonly class="w-full h-44 bg-[#060a12] border border-slate-800 rounded-xl p-3 text-xs mono-val text-slate-100" dir="ltr" placeholder="ستظهر مسودة التذكرة الجاهزة هنا فور فحص ملف access-results.zip..."></textarea>
+      </div>
     </section>
 
-    <!-- Pane 2: Deep Email Forensics -->
+    <!-- Pane 2: Deep Multi-File Forensics -->
+    <section id="p-deep" class="pane-box hidden space-y-4 text-xs">
+      <div class="bg-[#0c1322] border border-cyan-500/40 rounded-2xl p-4 space-y-3">
+        <h3 class="text-sm font-black text-cyan-300">الخط الزمني الجنائي الموحد (Timeline Reconstruction)</h3>
+        <div id="timelineBox" class="overflow-x-auto bg-[#060a12] border border-slate-800 rounded-xl p-2 text-slate-300">ارفع ملف access-results.zip لبناء الخط الزمني...</div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-[#0c1322] border border-slate-800 rounded-2xl p-4 space-y-2">
+          <h3 class="text-sm font-black text-indigo-300">سجل الأجهزة والشبكات والجلسات (data-file-8 / 11 / 13 / 14 / 15)</h3>
+          <div id="deviceNetworkBox" class="space-y-2 text-slate-300">في انتظار رفع الملف...</div>
+        </div>
+
+        <div class="bg-[#0c1322] border border-slate-800 rounded-2xl p-4 space-y-2">
+          <h3 class="text-sm font-black text-emerald-300">التحقق الحكومي والعمر والهاتف والأسماء (data-file-2 / 10 / 17 / 18 / 19)</h3>
+          <div id="identityBox" class="space-y-2 text-slate-300">في انتظار رفع الملف...</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-[#0c1322] border border-amber-500/40 rounded-2xl p-4 space-y-2">
+          <h3 class="text-sm font-black text-amber-300">التحليل المالي والفواتير المنسقة (data-file-3)</h3>
+          <div id="billingDeepBox" class="space-y-2 text-slate-300">في انتظار رفع الملف...</div>
+        </div>
+
+        <div class="bg-[#0c1322] border border-rose-500/40 rounded-2xl p-4 space-y-2">
+          <h3 class="text-sm font-black text-rose-300">سجل العقوبات والحظر والقفل الأمني (data-file-16)</h3>
+          <div id="moderationDeepBox" class="space-y-2 text-slate-300">في انتظار رفع الملف...</div>
+        </div>
+      </div>
+
+      <div class="bg-[#0c1322] border border-slate-800 rounded-2xl p-4 space-y-2">
+        <h3 class="text-sm font-black text-slate-200">جرد ملفات الأرشيف وفحص أمان المسارات</h3>
+        <div id="inventoryBox" class="text-slate-300">في انتظار رفع الملف...</div>
+      </div>
+    </section>
+
+    <!-- Pane 3: Deep Email Forensics -->
     <section id="p-m52" class="pane-box hidden space-y-4">
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div class="bg-[#0c1322] border border-rose-500/40 rounded-2xl p-4 space-y-2">
-          <h3 class="text-sm font-black text-rose-300">أول بريد مسجل وحالته</h3>
+          <h3 class="text-sm font-black text-rose-300">أول بريد مسجل وأول بريد موثق معتمد</h3>
           <div id="firstEmailBox" class="text-xs text-slate-300">اختر ملف الأرشيف أعلاه لبدء الفحص التلقائي...</div>
         </div>
         <div class="bg-[#0c1322] border border-cyan-500/40 rounded-2xl p-4 space-y-2">
-          <h3 class="text-sm font-black text-cyan-300">مقارنة أول بريد مع تاريخ إنشاء الحساب</h3>
+          <h3 class="text-sm font-black text-cyan-300">مقارنة أول بريد موثق مع تاريخ إنشاء الحساب</h3>
           <div id="gapBox" class="text-xs text-slate-300">اختر ملف الأرشيف أعلاه لبدء الفحص التلقائي...</div>
         </div>
       </div>
@@ -117,19 +274,27 @@
       </div>
     </section>
 
-    <!-- Pane 3: Variables & Trust Score -->
-    <section id="p-vars" class="pane-box hidden bg-[#0c1322] border border-slate-800 rounded-2xl p-4 space-y-4">
-      <h3 class="text-sm font-black text-emerald-300">المتغيرات المستخرجة تلقائياً ونقاط الثقة (Trust Score)</h3>
-      <div id="varsGridBox" class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-        <div class="text-slate-400">يرجى رفع ملف access-results.zip لتوليد المتغيرات تلقائياً.</div>
+    <!-- Pane 4: Codec -->
+    <section id="p-codec" class="pane-box hidden bg-[#0c1322] border border-emerald-500/40 rounded-2xl p-4 space-y-3">
+      <div class="flex flex-wrap justify-between items-center gap-2">
+        <div>
+          <h3 class="text-sm font-black text-emerald-300">حزمة الأدلة المضغوطة الجاهزة للشات</h3>
+          <p class="text-xs text-slate-400">انسخ هذه الحزمة والصقها في الشات إذا أردت متابعة إضافية مع المساعد الذكي</p>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="copyCodecNow()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs transition">📋 نسخ الحزمة الآن</button>
+          <button onclick="openAIEngine('gemini')" class="bg-[#4f46e5] hover:opacity-90 text-white font-bold px-3 py-2 rounded-xl text-xs transition">💎 افتح Gemini</button>
+          <button onclick="openAIEngine('chatgpt')" class="bg-[#10a37f] hover:opacity-90 text-white font-bold px-3 py-2 rounded-xl text-xs transition">🚀 افتح ChatGPT</button>
+        </div>
       </div>
+      <textarea id="codecArea" readonly class="w-full h-96 bg-[#060a12] border border-slate-800 rounded-xl p-3 text-xs mono-val text-emerald-200" dir="ltr" placeholder="ستظهر الحزمة المضغوطة هنا تلقائياً..."></textarea>
     </section>
 
-    <!-- Pane 4: Manual Fallback -->
+    <!-- Pane 5: Manual Fallback -->
     <section id="p-manual" class="pane-box hidden bg-[#0c1322] border border-slate-800 rounded-2xl p-5 space-y-4">
       <div class="border-b border-slate-800 pb-3">
         <h3 class="text-sm font-black text-amber-300">مسار الإدخال اليدوي الاحتياطي (لمن لا يملك ملف access-results.zip)</h3>
-        <p class="text-xs text-slate-400 mt-1">استخدم هذا القسم فقط إذا لم يكن لديك ملف ZIP، لتوليد تقرير تشخيصي لـ Gemini أو ChatGPT</p>
+        <p class="text-xs text-slate-400 mt-1">استخدم هذا القسم فقط إذا لم يكن لديك ملف ZIP</p>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="space-y-3 text-xs">
@@ -170,9 +335,9 @@
           </div>
         </div>
         <div class="space-y-3">
-          <label class="block font-bold text-xs text-slate-300">التقرير اليدوي الناتج للشات:</label>
+          <label class="block font-bold text-xs text-slate-300">التقرير اليدوي الناتج:</label>
           <textarea id="manualOut" readonly class="w-full h-72 bg-[#060a12] border border-slate-800 rounded-xl p-3 text-xs mono-val text-emerald-200" dir="ltr"></textarea>
-          <button onclick="copyManualText()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl text-xs transition">📋 نسخ التقرير اليدوي للشات</button>
+          <button onclick="copyManualText()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl text-xs transition">📋 نسخ التقرير اليدوي</button>
         </div>
       </div>
     </section>
