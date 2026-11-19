@@ -1,5 +1,11 @@
 {
   "name": "alberopbr",
   "main": "worker.js",
-  "compatibility_date": "2026-11-19"
+  "compatibility_date": "2026-11-19",
+  "kv_namespaces": [
+    {
+      "binding": "ALBER_CACHE",
+      "id": "77c4d88e3ebf42909a38ebfd1180722c"
+    }
+  ]
 }
