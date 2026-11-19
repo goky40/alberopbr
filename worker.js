@@ -5,7 +5,7 @@ export default {
     const origin = request.headers.get("Origin") || "";
 
     const corsHeaders = {
-      "Access-Control-Allow-Origin": origin === allowedOrigin ? allowedOrigin : allowedOrigin,
+      "Access-Control-Allow-Origin": allowedOrigin,
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
       "Vary": "Origin",
@@ -16,26 +16,20 @@ export default {
     }
 
     if (request.method !== "POST" || origin !== allowedOrigin) {
-      return new Response(JSON.stringify({ error: "Forbidden origin or method" }), {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     try {
-      const statusResp = await fetch(statusUrl, { cf: { cacheTtl: 60, cacheEverything: true } });
-      if (statusResp.ok) {
-        const statusData = await statusResp.json();
-        if (statusData.maintenance === true || statusData.ai_enabled === false) {
+      const st = await fetch(statusUrl, { cf: { cacheTtl: 60, cacheEverything: true } });
+      if (st.ok) {
+        const s = await st.json();
+        if (s.maintenance === true || s.ai_enabled === false) {
           return new Response(
-            JSON.stringify({
-              error: statusData.message || "الخدمة الذكية متوقفة مؤقتاً للصيانة.",
-              maintenance: true,
-            }),
-            {
-              status: 503,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            }
+            JSON.stringify({ error: s.message || "الخدمة متوقفة مؤقتاً للصيانة.", maintenance: true }),
+            { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
       }
@@ -52,113 +46,76 @@ export default {
         });
       }
 
-      const normalizedPayload = `${issueType}|${contextSummary.toLowerCase()}|${userMessage.toLowerCase().replace(/\s+/g, " ")}`;
-      const cacheKey = await sha256Hex(normalizedPayload);
-      const kvKey = `alber_q:${cacheKey}`;
+      const rawKey = `${issueType}|${contextSummary.toLowerCase()}|${userMessage.toLowerCase().replace(/\s+/g, " ")}`;
+      const kvKey = `alber_q:${await sha256Hex(rawKey)}`;
 
       if (env.ALBER_CACHE) {
-        const cachedReply = await env.ALBER_CACHE.get(kvKey);
-        if (cachedReply) {
-          return new Response(
-            JSON.stringify({
-              reply: cachedReply,
-              cached: true,
-            }),
-            {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            }
-          );
+        const cached = await env.ALBER_CACHE.get(kvKey);
+        if (cached) {
+          return new Response(JSON.stringify({ reply: cached, cached: true }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
         }
       }
 
-      const systemInstruction = String(env.SKILL_PROMPT || "").trim();
-      if (!env.GEMINI_API_KEY || !systemInstruction) {
-        return new Response(JSON.stringify({ error: "Worker secrets not configured" }), {
+      const sysPrompt = String(env.SKILL_PROMPT || "").trim();
+      if (!env.GEMINI_API_KEY || !sysPrompt) {
+        return new Response(JSON.stringify({ error: "Missing secrets" }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const geminiModel = env.GEMINI_MODEL || "gemini-2.5-flash";
-      const promptText = [
+      const model = env.GEMINI_MODEL || "gemini-2.5-flash";
+      const prompt = [
         `Issue Type: ${issueType}`,
         contextSummary ? `Diagnostic Context:\n${contextSummary}` : "",
         `User Request:\n${userMessage}`,
-      ]
-        .filter(Boolean)
-        .join("\n\n");
+      ].filter(Boolean).join("\n\n");
 
-      const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${env.GEMINI_API_KEY}`,
+      const gRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            systemInstruction: {
-              parts: [{ text: systemInstruction }],
-            },
-            contents: [
-              {
-                role: "user",
-                parts: [{ text: promptText }],
-              },
-            ],
-            generationConfig: {
-              temperature: 0.25,
-              maxOutputTokens: 900,
-            },
+            systemInstruction: { parts: [{ text: sysPrompt }] },
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.25, maxOutputTokens: 900 },
           }),
         }
       );
 
-      if (!geminiRes.ok) {
-        const errText = await geminiRes.text();
-        return new Response(
-          JSON.stringify({ error: "Gemini API error", details: errText.slice(0, 300) }),
-          {
-            status: 502,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
+      if (!gRes.ok) {
+        const errTxt = await gRes.text();
+        return new Response(JSON.stringify({ error: "Gemini API error", details: errTxt.slice(0, 300) }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
-      const geminiJson = await geminiRes.json();
-      const replyText =
-        geminiJson?.candidates?.[0]?.content?.parts
-          ?.map((p) => p.text || "")
-          .join("")
-          .trim() || "تعذر توليد رد مناسب حالياً.";
+      const gJson = await gRes.json();
+      const reply =
+        gJson?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("").trim() ||
+        "تعذر توليد رد مناسب حالياً.";
 
-      if (env.ALBER_CACHE && replyText) {
-        ctx.waitUntil(
-          env.ALBER_CACHE.put(kvKey, replyText, { expirationTtl: 604800 })
-        );
+      if (env.ALBER_CACHE && reply) {
+        ctx.waitUntil(env.ALBER_CACHE.put(kvKey, reply, { expirationTtl: 604800 }));
       }
 
-      return new Response(
-        JSON.stringify({
-          reply: replyText,
-          cached: false,
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    } catch (err) {
-      return new Response(
-        JSON.stringify({ error: "Internal worker error", message: String(err?.message || err) }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return new Response(JSON.stringify({ reply, cached: false }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: "Worker error", message: String(e?.message || e) }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
   },
 };
 
-async function sha256Hex(input) {
-  const data = new TextEncoder().encode(input);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+async function sha256Hex(str) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
