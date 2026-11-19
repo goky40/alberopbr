@@ -75,29 +75,42 @@ export default {
         });
       }
 
-      const model = env.GEMINI_MODEL || "gemini-3.8-flash";
+      const primaryModel = env.GEMINI_MODEL || "gemini-3.8-flash";
+      const fallbackModels = [primaryModel, "gemini-2.5-flash-lite", "gemini-2.5-pro"];
+      const modelsToTry = [...new Set(fallbackModels)];
+
       const prompt = [
         `Issue Type: ${issueType}`,
         contextSummary ? `Diagnostic Context:\n${contextSummary}` : "",
         `User Request:\n${userMessage}`,
       ].filter(Boolean).join("\n\n");
 
-      const gRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: cachedSkillPrompt }] },
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.25, maxOutputTokens: 2048 },
-          }),
-        }
-      );
+      const payloadBody = JSON.stringify({
+        systemInstruction: { parts: [{ text: cachedSkillPrompt }] },
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.25, maxOutputTokens: 2048 },
+      });
 
-      if (!gRes.ok) {
-        const errTxt = await gRes.text();
-        return new Response(JSON.stringify({ error: "Gemini API error", details: errTxt.slice(0, 300) }), {
+      let gRes = null;
+      let lastErrTxt = "";
+
+      for (const m of modelsToTry) {
+        gRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${env.GEMINI_API_KEY}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: payloadBody,
+          }
+        );
+
+        if (gRes.ok) break;
+        lastErrTxt = await gRes.text();
+        if (![503, 429, 404].includes(gRes.status)) break;
+      }
+
+      if (!gRes || !gRes.ok) {
+        return new Response(JSON.stringify({ error: "Gemini API error", details: lastErrTxt.slice(0, 300) }), {
           status: 502,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
