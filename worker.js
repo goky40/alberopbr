@@ -93,6 +93,7 @@ export default {
 
       let gRes = null;
       let lastErrTxt = "";
+      let hitRateLimit = false;
 
       for (const m of modelsToTry) {
         gRes = await fetch(
@@ -106,14 +107,29 @@ export default {
 
         if (gRes.ok) break;
         lastErrTxt = await gRes.text();
-        if (![503, 429, 404].includes(gRes.status)) break;
+
+        if (gRes.status === 429) {
+          hitRateLimit = true;
+          await new Promise((r) => setTimeout(r, 400));
+          continue;
+        }
+        if (![503, 404].includes(gRes.status)) break;
       }
 
       if (!gRes || !gRes.ok) {
-        return new Response(JSON.stringify({ error: "Gemini API error", details: lastErrTxt.slice(0, 300) }), {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        const statusCode = hitRateLimit && (!gRes || gRes.status === 429) ? 429 : 502;
+        return new Response(
+          JSON.stringify({
+            error: hitRateLimit
+              ? "تم الوصول لحد الطلبات المؤقت (Rate limit) على Gemini API. انتظر قليلاً أو راجع الفوترة."
+              : "Gemini API error",
+            details: lastErrTxt.slice(0, 300),
+          }),
+          {
+            status: statusCode,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
       }
 
       const gJson = await gRes.json();
