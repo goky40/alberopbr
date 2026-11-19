@@ -18,16 +18,16 @@ export default {
     }
 
     if (request.method !== "POST" || origin !== allowedOrigin) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), {
+      return new Response(JSON.stringify({ error: "Forbidden", origin }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     try {
-      const st = await fetch(statusUrl, { cf: { cacheTtl: 60, cacheEverything: true } });
+      const st = await fetch(statusUrl, { cf: { cacheTtl: 30, cacheEverything: false } });
       if (st.ok) {
-        const s = await st.json();
+        const s = await st.json().catch(() => ({}));
         if (s.maintenance === true || s.ai_enabled === false) {
           return new Response(
             JSON.stringify({ error: s.message || "الخدمة متوقفة مؤقتاً للصيانة.", maintenance: true }),
@@ -36,16 +36,38 @@ export default {
         }
       }
 
-      const body = await request.json();
+      const body = await request.json().catch(() => ({}));
       const issueType = String(body.issueType || "general").trim().slice(0, 80);
-      const contextSummary = String(body.contextSummary || "").trim().slice(0, 2000);
-      const userMessage = String(body.message || "").trim().slice(0, 1500);
+      const contextSummary = String(body.contextSummary || "").trim().slice(0, 1500);
+      const userMessage = String(body.message || "").trim().slice(0, 1200);
 
       if (!userMessage && !contextSummary) {
         return new Response(JSON.stringify({ error: "Empty query" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      }
+
+      if (!cachedSkillPrompt) {
+        const fromEnv = String(env.SKILL_PROMPT || "").trim();
+        const fromKv = env.ALBER_CACHE
+          ? String((await env.ALBER_CACHE.get("alber_skill_prompt")) || "").trim()
+          : "";
+        cachedSkillPrompt = fromEnv || fromKv;
+      }
+
+      if (!env.GEMINI_API_KEY || !cachedSkillPrompt) {
+        return new Response(
+          JSON.stringify({
+            error: "Missing secrets or skill prompt",
+            hasKey: Boolean(env.GEMINI_API_KEY),
+            hasPrompt: Boolean(cachedSkillPrompt),
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
       }
 
       const rawKey = `${issueType}|${contextSummary.toLowerCase()}|${userMessage.toLowerCase().replace(/\s+/g, " ")}`;
@@ -60,24 +82,8 @@ export default {
         }
       }
 
-      if (!cachedSkillPrompt) {
-        const fromEnv = String(env.SKILL_PROMPT || "").trim();
-        const fromKv = env.ALBER_CACHE
-          ? String((await env.ALBER_CACHE.get("alber_skill_prompt")) || "").trim()
-          : "";
-        cachedSkillPrompt = fromEnv || fromKv;
-      }
-
-      if (!env.GEMINI_API_KEY || !cachedSkillPrompt) {
-        return new Response(JSON.stringify({ error: "Missing secrets or skill prompt" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
       const primaryModel = env.GEMINI_MODEL || "gemini-3.8-flash";
-      const fallbackModels = [primaryModel, "gemini-2.5-flash-lite", "gemini-2.5-pro"];
-      const modelsToTry = [...new Set(fallbackModels)];
+      const modelsToTry = [...new Set([primaryModel, "gemini-2.5-flash-lite", "gemini-2.5-pro"])];
 
       const prompt = [
         `Issue Type: ${issueType}`,
